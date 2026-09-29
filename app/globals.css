@@ -43,8 +43,12 @@ button, input { font: inherit; } button { cursor: pointer; }
 .icon-button { position: relative; width: 38px; height: 38px; border: 0; background: transparent; display: grid; place-items: center; border-radius: 12px; color: #536258; }
 .icon-button:hover { background: #f0f4f1; }
 .notification-dot { position: absolute; width: 7px; height: 7px; background: #ff6b35; border: 2px solid white; border-radius: 50%; right: 7px; top: 7px; }
-.role-select { min-width: 116px; height: 38px !important; background: white; border-color: #dde4df; }
+.current-role { display: inline-flex; align-items: center; height: 30px; padding: 0 10px; border-radius: 999px; background: #edf8f1; color: #16894b; font-size: .75rem; font-weight: 800; }
+.current-role.seller { background: #fff3e7; color: #b56523; }
+.current-role.admin { background: #eef2ff; color: #4d5eaf; }
 .avatar { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: #173f2b; color: white; font-size: .83rem; font-weight: 750; }
+.logout-button { height: 36px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid #dde4df; border-radius: 11px; padding: 0 11px; background: white; color: #66736b; font-size: .78rem; font-weight: 700; }
+.logout-button:hover { border-color: #b9c8be; background: #f4f7f5; color: #263c2e; }
 .navrow { min-height: 48px; display: flex; align-items: center; justify-content: space-between; }
 .navlinks, .role-links { display: flex; align-items: center; gap: 25px; }
 .navlinks button, .role-links button { border: 0; background: transparent; color: #66736b; font-size: .9rem; font-weight: 650; padding: 15px 0 12px; display: inline-flex; align-items: center; gap: 6px; border-bottom: 3px solid transparent; }
@@ -85,10 +89,47 @@ button, input { font: inherit; } button { cursor: pointer; }
 .risk-card { padding-bottom: 14px; } .risk-item { display: grid; grid-template-columns: 10px 1fr; gap: 12px; padding: 15px 0; border-top: 1px solid #edf0ed; } .risk-dot { width: 9px; height: 9px; border-radius: 50%; margin-top: 5px; } .risk-dot.orange { background: #f59b45; } .risk-dot.green { background: #28a965; } .risk-dot.red { background: #e15757; } .risk-item strong { font-size: .86rem; } .risk-item p { margin: 5px 0 0; color: #859189; font-size: .75rem; }
 .order-grid { display: grid; gap: 14px; } .order-card { display: grid; grid-template-columns: 80px 1fr auto; align-items: center; gap: 20px; background: white; border: 1px solid #e3e8e4; border-radius: 18px; padding: 22px; } .order-icon { width: 80px; height: 80px; display: grid; place-items: center; border-radius: 15px; background: #ffe1a5; font-size: 2.4rem; } .order-icon.green { background: #dcefd8; } .order-info h3 { margin: 8px 0 4px; font-size: 1rem; } .order-info p { margin: 0 0 9px; color: #7e8982; font-size: .78rem; } .order-info small { color: #69766e; } .order-progress { width: min(420px, 100%); margin-bottom: 7px; }
 
+.login-screen { min-height: 100vh; display: grid; grid-template-columns: minmax(420px, 1.08fr) minmax(480px, .92fr); background: white; }
+.login-showcase { position: relative; min-height: 100vh; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; padding: 48px clamp(38px, 6vw, 90px); color: white; background: linear-gradient(140deg, #071e35e8, #0c4937d9), url('/hero-grocery.png') center/cover; }
+.login-showcase::after { content: ''; position: absolute; width: 360px; height: 360px; right: -120px; bottom: -120px; border: 1px solid #ffffff30; border-radius: 50%; box-shadow: 0 0 0 72px #ffffff0b, 0 0 0 144px #ffffff08; }
+.login-brand { position: relative; z-index: 1; display: flex; align-items: center; gap: 12px; font-size: 1.3rem; font-weight: 850; letter-spacing: -.04em; }
+.login-brand .brand-mark { background: white; color: #16894b; box-shadow: 0 8px 24px #061a1638; }
+.login-showcase-copy { position: relative; z-index: 1; max-width: 610px; margin: auto 0; padding: 80px 0; }
+.login-badge { border: 1px solid #ffffff32; background: #ffffff16; color: #d7f8e2; letter-spacing: .08em; backdrop-filter: blur(8px); }
+.login-showcase h1 { margin: 22px 0 20px; font-size: clamp(2.7rem, 5vw, 4.9rem); line-height: 1.04; letter-spacing: -.065em; }
+.login-showcase-copy p { max-width: 540px; margin: 0; color: #d7e9df; font-size: 1.05rem; line-height: 1.75; }
+.login-live-card { position: relative; z-index: 1; width: fit-content; display: flex; align-items: center; gap: 10px; border: 1px solid #ffffff30; border-radius: 14px; padding: 12px 15px; background: #041a16a8; color: #e8f7ee; font-size: .83rem; font-weight: 650; backdrop-filter: blur(10px); }
+.live-pulse { width: 9px; height: 9px; border-radius: 50%; background: #ff715b; box-shadow: 0 0 0 5px #ff715b2b; }
+.login-panel { display: grid; place-items: center; padding: 48px clamp(32px, 6vw, 82px); background: #fbfcfb; }
+.login-form { width: min(100%, 520px); }
+.login-heading { margin-bottom: 30px; }
+.login-heading p { margin: 0 0 7px; color: #16894b; font-size: .8rem; font-weight: 800; }
+.login-heading h2 { margin: 0; color: #17251c; font-size: 2.35rem; letter-spacing: -.055em; }
+.login-heading span { display: block; margin-top: 10px; color: #748078; font-size: .92rem; }
+.role-fieldset { min-width: 0; margin: 0 0 25px; padding: 0; border: 0; }
+.role-fieldset legend { margin-bottom: 11px; color: #344139; font-size: .84rem; font-weight: 750; }
+.login-role-grid { grid-template-columns: repeat(3, 1fr); gap: 9px; }
+.login-role-card { position: relative; min-width: 0; min-height: 128px; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 15px; border: 1px solid #dfe5e1; border-radius: 16px; background: white; cursor: pointer; transition: border-color .18s, background .18s, box-shadow .18s, transform .18s; }
+.login-role-card:hover { transform: translateY(-2px); border-color: #b7c9bd; }
+.login-role-card.selected { border-color: #16894b; background: #f2faf5; box-shadow: 0 0 0 3px #16894b13; }
+.login-role-card [data-slot='radio-group-item'] { position: absolute; right: 13px; top: 13px; }
+.login-role-icon { width: 35px; height: 35px; display: grid; place-items: center; border-radius: 11px; background: #eaf6ee; color: #16894b; }
+.login-role-icon svg { width: 18px; }
+.login-role-card strong { display: block; color: #253229; font-size: .9rem; }
+.login-role-card small { display: block; margin-top: 5px; color: #7d8881; font-size: .68rem; line-height: 1.4; }
+.login-fields { display: grid; gap: 9px; }
+.login-fields label:not(:first-child) { margin-top: 10px; }
+.login-fields input { height: 47px; border-radius: 12px; background: white; padding: 0 14px; font-size: .92rem; }
+.login-submit { width: 100%; height: 49px; margin-top: 24px; border-radius: 12px; background: #16894b; font-size: .95rem; font-weight: 800; }
+.login-submit:hover { background: #11763f; }
+.login-demo-note { margin: 13px 0 0; color: #8a948e; text-align: center; font-size: .72rem; }
+
 @media (max-width: 900px) {
   .topbar { grid-template-columns: auto 1fr auto; } .brand > span:last-child { display: none; } .searchbox { min-width: 0; } .navlinks { gap: 15px; } .navlinks button:nth-child(n+4) { display: none; } .product-grid, .metric-grid { grid-template-columns: repeat(2, 1fr); } .admin-columns { grid-template-columns: 1fr; } .hero-copy { width: 68%; padding: 48px 38px; } .quick-stats { grid-template-columns: repeat(2, 1fr); gap: 20px 0; } .quick-stats > div:nth-child(2) { border-right: 0; }
+  .login-screen { grid-template-columns: 1fr; } .login-showcase { min-height: 330px; padding: 32px 40px; } .login-showcase-copy { padding: 55px 0 28px; } .login-showcase h1 { max-width: 650px; font-size: 3rem; } .login-showcase-copy p { font-size: .95rem; } .login-panel { padding: 52px 32px 70px; }
 }
 
 @media (max-width: 620px) {
-  .topbar, .navrow, .page-shell, .dashboard-shell { width: min(100% - 28px, 1180px); } .topbar { min-height: 65px; grid-template-columns: auto 1fr auto; gap: 10px; } .searchbox { height: 40px; } .searchbox input::placeholder { color: transparent; } .icon-button, .avatar { display: none; } .role-select { min-width: 104px; } .navrow { overflow-x: auto; gap: 20px; } .navlinks, .role-links { flex-shrink: 0; } .hero { height: 425px; } .hero img { object-position: 67% center; } .hero-overlay { background: linear-gradient(90deg, #08223ff5 0%, #08223fe9 55%, #08223f55 100%); } .hero-copy { width: 88%; padding: 42px 25px; } .hero-copy > p:not(.eyebrow) { font-size: .9rem; } .hero-stat { right: 16px; bottom: 16px; } .quick-stats, .product-grid, .metric-grid { grid-template-columns: 1fr; } .quick-stats > div { justify-content: flex-start; border-right: 0; padding-left: 25px; } .product-visual { height: 210px; } .section-heading h2 { font-size: 1.5rem; } .dashboard-heading h1 { font-size: 1.65rem; } .order-card { grid-template-columns: 62px 1fr; } .order-icon { width: 62px; height: 62px; } .order-card > :last-child { grid-column: 2; justify-self: start; } .table-card { padding: 17px; } .table-title { align-items: flex-start; gap: 12px; } .desktop-only { display: none; }
+  .topbar, .navrow, .page-shell, .dashboard-shell { width: min(100% - 28px, 1180px); } .topbar { min-height: 65px; grid-template-columns: auto 1fr auto; gap: 10px; } .searchbox { height: 40px; } .searchbox input::placeholder { color: transparent; } .icon-button, .avatar, .current-role { display: none; } .logout-button { width: 38px; padding: 0; justify-content: center; font-size: 0; } .navrow { overflow-x: auto; gap: 20px; } .navlinks, .role-links { flex-shrink: 0; } .hero { height: 425px; } .hero img { object-position: 67% center; } .hero-overlay { background: linear-gradient(90deg, #08223ff5 0%, #08223fe9 55%, #08223f55 100%); } .hero-copy { width: 88%; padding: 42px 25px; } .hero-copy > p:not(.eyebrow) { font-size: .9rem; } .hero-stat { right: 16px; bottom: 16px; } .quick-stats, .product-grid, .metric-grid { grid-template-columns: 1fr; } .quick-stats > div { justify-content: flex-start; border-right: 0; padding-left: 25px; } .product-visual { height: 210px; } .section-heading h2 { font-size: 1.5rem; } .dashboard-heading h1 { font-size: 1.65rem; } .order-card { grid-template-columns: 62px 1fr; } .order-icon { width: 62px; height: 62px; } .order-card > :last-child { grid-column: 2; justify-self: start; } .table-card { padding: 17px; } .table-title { align-items: flex-start; gap: 12px; } .desktop-only { display: none; }
+  .login-showcase { min-height: 280px; padding: 25px 22px; } .login-showcase-copy { padding: 38px 0 10px; } .login-showcase h1 { margin: 16px 0 12px; font-size: 2.18rem; } .login-showcase-copy p { font-size: .85rem; line-height: 1.6; } .login-live-card { display: none; } .login-panel { padding: 38px 18px 56px; } .login-heading h2 { font-size: 2rem; } .login-role-grid { grid-template-columns: 1fr; } .login-role-card { min-height: 78px; display: grid; grid-template-columns: 38px 1fr; align-items: center; gap: 12px; padding: 12px 15px; } .login-role-card [data-slot='radio-group-item'] { right: 15px; top: 50%; transform: translateY(-50%); } .login-role-card small { max-width: 210px; }
 }

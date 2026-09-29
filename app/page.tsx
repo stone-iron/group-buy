@@ -1,31 +1,29 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { type FormEvent, useEffect, useMemo, useState } from 'react';
 import {
   Bell,
   ChevronRight,
   Clock3,
   Heart,
   LayoutDashboard,
+  LogOut,
   PackageCheck,
   Search,
   ShieldCheck,
   ShoppingBag,
   Store,
   Truck,
+  UserRound,
   Users,
   WalletCards,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import {
   Table,
   TableBody,
@@ -46,18 +44,32 @@ const products = [
 ];
 
 const won = (value: number) => `${value.toLocaleString('ko-KR')}원`;
+const roleLabels: Record<Role, string> = {
+  buyer: '구매자',
+  seller: '판매자',
+  admin: '관리자',
+};
 
 export default function Home() {
   const [role, setRole] = useState<Role>('buyer');
+  const [selectedRole, setSelectedRole] = useState<Role>('buyer');
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [view, setView] = useState<View>('home');
   const [counts, setCounts] = useState<Record<number, number>>(Object.fromEntries(products.map((product) => [product.id, product.joined])));
   const [notice, setNotice] = useState('');
   const activeProducts = useMemo(() => products.map((product) => ({ ...product, joined: counts[product.id] })), [counts]);
 
-  const switchRole = (nextRole: Role | null) => {
-    if (!nextRole) return;
-    setRole(nextRole);
-    setView(nextRole === 'buyer' ? 'home' : nextRole);
+  const login = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setRole(selectedRole);
+    setView(selectedRole === 'buyer' ? 'home' : selectedRole);
+    setIsLoggedIn(true);
+    setNotice(`${roleLabels[selectedRole]} 모드로 로그인했습니다.`);
+  };
+
+  const logout = () => {
+    setIsLoggedIn(false);
+    setView('home');
     setNotice('');
   };
 
@@ -100,6 +112,8 @@ export default function Home() {
         setCounts((current) => ({ ...current, [productId]: current[productId] + 1 }));
         setNotice(`‘${product.title}’ 공동구매에 참여했어요. 가상 결제가 완료되었습니다.`);
         setRole('buyer');
+        setSelectedRole('buyer');
+        setIsLoggedIn(true);
         setView('home');
         return { productId, status: 'joined', productTitle: product.title };
       },
@@ -107,6 +121,10 @@ export default function Home() {
 
     return () => lifecycle.abort();
   }, []);
+
+  if (!isLoggedIn) {
+    return <LoginPage selectedRole={selectedRole} onRoleChange={setSelectedRole} onLogin={login} />;
+  }
 
   return (
     <main className="min-h-screen bg-[#f7f8fa] text-[#152019]">
@@ -118,15 +136,9 @@ export default function Home() {
           <label className="searchbox"><Search size={18} /><input aria-label="상품 검색" placeholder="어떤 상품을 함께 살까요?" /></label>
           <nav className="header-actions" aria-label="사용자 메뉴">
             <button className="icon-button" aria-label="알림"><Bell size={20} /><span className="notification-dot" /></button>
-            <Select value={role} onValueChange={(value) => switchRole(value as Role)}>
-              <SelectTrigger className="role-select"><SelectValue /></SelectTrigger>
-              <SelectContent align="end">
-                <SelectItem value="buyer">구매자 모드</SelectItem>
-                <SelectItem value="seller">판매자 모드</SelectItem>
-                <SelectItem value="admin">관리자 모드</SelectItem>
-              </SelectContent>
-            </Select>
+            <span className={`current-role ${role}`}>{roleLabels[role]}</span>
             <span className="avatar">김</span>
+            <button className="logout-button" onClick={logout}><LogOut size={16} /> 로그아웃</button>
           </nav>
         </div>
         <div className="navrow">
@@ -135,7 +147,7 @@ export default function Home() {
             <button>신규 오픈</button><button>마감 임박</button><button>식품</button><button>생활</button>
           </nav>
           <div className="role-links">
-            <button className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ShoppingBag size={16} /> 내 주문</button>
+            {role === 'buyer' && <button className={view === 'orders' ? 'active' : ''} onClick={() => setView('orders')}><ShoppingBag size={16} /> 내 주문</button>}
             {role === 'seller' && <button className={view === 'seller' ? 'active' : ''} onClick={() => setView('seller')}><Store size={16} /> 판매자센터</button>}
             {role === 'admin' && <button className={view === 'admin' ? 'active' : ''} onClick={() => setView('admin')}><ShieldCheck size={16} /> 관리자센터</button>}
           </div>
@@ -147,6 +159,69 @@ export default function Home() {
       {view === 'orders' && <OrdersPage />}
       {view === 'seller' && role === 'seller' && <SellerDashboard products={activeProducts} />}
       {view === 'admin' && role === 'admin' && <AdminDashboard />}
+    </main>
+  );
+}
+
+function LoginPage({
+  selectedRole,
+  onRoleChange,
+  onLogin,
+}: {
+  selectedRole: Role;
+  onRoleChange: (role: Role) => void;
+  onLogin: (event: FormEvent<HTMLFormElement>) => void;
+}) {
+  const roleOptions = [
+    { value: 'buyer' as const, label: '구매자', description: '공동구매 참여와 주문·배송 조회', icon: <UserRound /> },
+    { value: 'seller' as const, label: '판매자', description: '상품·방송·주문과 배송 관리', icon: <Store /> },
+    { value: 'admin' as const, label: '관리자', description: '회원·판매자 승인과 플랫폼 운영', icon: <ShieldCheck /> },
+  ];
+
+  return (
+    <main className="login-screen">
+      <section className="login-showcase" aria-label="모두모임 서비스 소개">
+        <div className="login-brand"><span className="brand-mark">M</span><span>모두모임</span></div>
+        <div className="login-showcase-copy">
+          <Badge className="login-badge">LIVE GROUP BUY</Badge>
+          <h1>함께 사는 순간,<br />더 좋은 가격이 열립니다.</h1>
+          <p>실시간 방송을 보며 한정 수량 공동구매에 참여하고, 판매와 운영까지 한곳에서 관리하세요.</p>
+        </div>
+        <div className="login-live-card"><span className="live-pulse" /> 지금 8,920명이 공동구매에 참여하고 있어요</div>
+      </section>
+
+      <section className="login-panel">
+        <form className="login-form" onSubmit={onLogin}>
+          <div className="login-heading">
+            <p>다시 만나서 반가워요</p>
+            <h2>로그인</h2>
+            <span>이용할 역할을 선택하고 계정 정보를 입력하세요.</span>
+          </div>
+
+          <fieldset className="role-fieldset">
+            <legend>로그인 역할</legend>
+            <RadioGroup value={selectedRole} onValueChange={(value) => onRoleChange(value as Role)} className="login-role-grid">
+              {roleOptions.map((option) => (
+                <Label className={`login-role-card ${selectedRole === option.value ? 'selected' : ''}`} key={option.value}>
+                  <RadioGroupItem value={option.value} aria-label={`${option.label} 선택`} />
+                  <span className="login-role-icon">{option.icon}</span>
+                  <span><strong>{option.label}</strong><small>{option.description}</small></span>
+                </Label>
+              ))}
+            </RadioGroup>
+          </fieldset>
+
+          <div className="login-fields">
+            <Label htmlFor="login-email">이메일</Label>
+            <Input id="login-email" name="email" type="email" placeholder="name@example.com" autoComplete="email" required />
+            <Label htmlFor="login-password">비밀번호</Label>
+            <Input id="login-password" name="password" type="password" placeholder="비밀번호를 입력하세요" autoComplete="current-password" required />
+          </div>
+
+          <Button type="submit" className="login-submit">{roleLabels[selectedRole]}로 로그인</Button>
+          <p className="login-demo-note">현재는 화면 확인용 로그인입니다. 테스트 정보를 입력해 이용할 수 있습니다.</p>
+        </form>
+      </section>
     </main>
   );
 }
