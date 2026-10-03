@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: '모두모임 | 함께 사서 더 좋은 가격',
+  title: '여기모여 | 함께 모여 더 좋은 가격',
   description: '구매자, 판매자, 관리자가 함께 사용하는 공동구매 플랫폼',
 };
 
