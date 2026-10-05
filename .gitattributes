@@ -1,0 +1,4 @@
+# The UI prototype and shared UI primitives are generated/scaffolded sources.
+# Keep them in the repository while preventing them from dominating GitHub Linguist statistics.
+app/page.tsx linguist-generated=true
+components/ui/** linguist-generated=true
