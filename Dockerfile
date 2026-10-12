@@ -1,0 +1,34 @@
+FROM node:22-alpine AS build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY . .
+
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_RTMP_URL
+ARG NEXT_PUBLIC_HLS_URL
+ARG NEXT_PUBLIC_WS_URL
+ARG NEXT_PUBLIC_TOSS_CLIENT_KEY
+
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    NEXT_PUBLIC_RTMP_URL=${NEXT_PUBLIC_RTMP_URL} \
+    NEXT_PUBLIC_HLS_URL=${NEXT_PUBLIC_HLS_URL} \
+    NEXT_PUBLIC_WS_URL=${NEXT_PUBLIC_WS_URL} \
+    NEXT_PUBLIC_TOSS_CLIENT_KEY=${NEXT_PUBLIC_TOSS_CLIENT_KEY}
+
+RUN npm run build
+
+FROM node:22-alpine AS runtime
+
+WORKDIR /app
+ENV NODE_ENV=production \
+    PORT=3000 \
+    HOST=0.0.0.0
+
+COPY --from=build /app/dist/standalone ./
+
+EXPOSE 3000
+CMD ["node", "server.js"]

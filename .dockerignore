@@ -1,0 +1,12 @@
+.git
+.idea
+.vinext
+.wrangler
+dist
+node_modules
+outputs
+work
+.env*
+backend
+docs
+npm-debug.log*
