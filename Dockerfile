@@ -28,6 +28,7 @@ ENV NODE_ENV=production \
     PORT=3000 \
     HOST=0.0.0.0
 
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist/standalone ./
 
 EXPOSE 3000
