@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
@@ -31,5 +32,15 @@ public class GroupBuyController {
     public GroupBuyCampaignResponse join(@PathVariable Long productId,
                                          @Valid @RequestBody GroupBuyJoinRequest request) {
         return service.join(productId, request);
+    }
+
+    @GetMapping("/participations")
+    public List<BuyerGroupBuyParticipationResponse> memberParticipations(@RequestParam Long memberId) {
+        return service.participationsForMember(memberId);
+    }
+
+    @GetMapping("/{productId}/participations")
+    public List<SellerGroupBuyParticipationResponse> productParticipations(@PathVariable Long productId) {
+        return service.participationsForProduct(productId);
     }
 }

@@ -43,4 +43,10 @@ public class GroupBuyParticipation {
 
     @PrePersist
     void prePersist() { createdAt = LocalDateTime.now(); }
+
+    public Long getId() { return id; }
+    public Long getProductId() { return productId; }
+    public Long getMemberId() { return memberId; }
+    public int getQuantity() { return quantity; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
 }

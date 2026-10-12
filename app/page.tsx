@@ -107,6 +107,8 @@ type PurchaseQueueStatus = 'WAITING' | 'PROCESSING' | 'RESERVED' | 'CONFIRMED' |
 type PurchaseQueueTicket = { ticketId: number; productId: number; quantity: number; status: PurchaseQueueStatus; waitingAhead: number; position: number; totalQuantity: number; soldQuantity: number; reservedQuantity: number; remainingQuantity: number; maxPerMember: number; memberRequestedQuantity: number; memberRemainingLimit: number; expiresAt?: string; message: string };
 type InventorySnapshot = { productId: number; totalQuantity: number; soldQuantity: number; reservedQuantity: number; remainingQuantity: number; availableQuantity: number };
 type GroupBuyCampaignSnapshot = { productId: number; goalQuantity: number; joinedQuantity: number; remainingQuantity: number; goalReached: boolean; status: 'RECRUITING' | 'GOAL_REACHED'; message: string };
+type BuyerGroupBuyParticipation = { id: number; productId: number; productTitle: string; quantity: number; participatedAt: string; goalQuantity: number; joinedQuantity: number; remainingQuantity: number; goalReached: boolean; status: 'RECRUITING' | 'GOAL_REACHED' };
+type SellerGroupBuyParticipation = { id: number; productId: number; memberId: number; memberName: string; quantity: number; participatedAt: string };
 type TossPaymentPrepare = { ticketId: number; orderId: string; orderName: string; customerKey: string; amount: number };
 type TossPaymentContext = { ticketId: number; user: MemberProfile; role: Role };
 type ShippingInformation = { recipientName: string; phone: string; postalCode: string; address: string; addressDetail: string; deliveryMessage: string };
@@ -201,6 +203,13 @@ const appNotifications = [
 const initialLiveBroadcasts: LiveBroadcast[] = [];
 
 const won = (value: number) => `${value.toLocaleString('ko-KR')}원`;
+const participationDate = (value: string) => new Intl.DateTimeFormat('ko-KR', {
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+}).format(new Date(value));
 
 function createRequestKey() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
@@ -1243,7 +1252,7 @@ export default function Home() {
           onToggleLike={toggleProductLike}
         />
       )}
-      {view === 'orders' && <OrdersPage />}
+      {view === 'orders' && currentUser && <OrdersPage memberId={currentUser.id} products={activeProducts} onOpenProduct={openProduct} />}
       {view === 'live' && <LiveCommercePage role={role} currentUserName={currentUser?.name ?? ''} broadcasts={liveBroadcasts} subscribedLiveIds={subscribedLiveIds} onWatch={openLiveBroadcast} onManage={openLiveStudio} onCreate={() => setView('live-create')} onApprove={(id) => updateLiveStatus(id, 'scheduled')} onReject={(id, reason) => updateLiveStatus(id, 'rejected', reason)} onSubscribe={subscribeLiveBroadcast} onStart={startLiveBroadcast} onEnd={endLiveBroadcast} onNotice={setNotice} />}
       {view === 'live-create' && role === 'seller' && <CreateLivePage sellerName={currentUser?.name ?? '판매자'} products={activeProducts} onBack={() => setView('live')} onCreate={createLiveBroadcast} />}
       {view === 'live-watch' && selectedLiveId && (() => { const broadcast = liveBroadcasts.find((item) => item.id === selectedLiveId); if (!broadcast) return null; const product = activeProducts.find((item) => item.id === broadcast.productId); return <LiveWatchPage broadcast={broadcast} broadcasts={liveBroadcasts.filter((item) => item.status === 'live')} product={product} products={activeProducts} currentUserName={currentUser?.name ?? '구매자'} canParticipate={role === 'buyer'} onBack={() => { window.history.replaceState({}, '', `${window.location.pathname}${window.location.search}`); setView('live'); }} onSelectBroadcast={setSelectedLiveId} onParticipate={participate} onNotice={setNotice} />; })()}
@@ -2168,7 +2177,10 @@ function LiveWatchPage({ broadcast, broadcasts, product, products: liveProducts,
   );
 }
 
-function OrdersPage() {
+function OrdersPage({ memberId, products: items, onOpenProduct }: { memberId: number; products: Product[]; onOpenProduct: (id: number) => void }) {
+  const [participations, setParticipations] = useState<BuyerGroupBuyParticipation[]>([]);
+  const [participationsLoading, setParticipationsLoading] = useState(true);
+  const [participationsError, setParticipationsError] = useState('');
   const [trackingOpen, setTrackingOpen] = useState(false);
   const [trackingResult, setTrackingResult] = useState<DeliveryTrackingResult | null>(null);
   const [trackingError, setTrackingError] = useState('');
@@ -2183,6 +2195,20 @@ function OrdersPage() {
     { code: '24', name: 'GS Postbox' },
     { code: '46', name: 'CU 편의점택배' },
   ];
+
+  useEffect(() => {
+    let active = true;
+    void fetch(`${API_BASE_URL}/api/group-buys/participations?memberId=${encodeURIComponent(memberId)}`)
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as BuyerGroupBuyParticipation[] & { message?: string };
+        if (!response.ok) throw new Error(result.message ?? '참여 내역을 불러오지 못했습니다.');
+        return result;
+      })
+      .then((result) => { if (active) setParticipations(result); })
+      .catch((error) => { if (active) setParticipationsError(error instanceof Error ? error.message : '참여 내역을 불러오지 못했습니다.'); })
+      .finally(() => { if (active) setParticipationsLoading(false); });
+    return () => { active = false; };
+  }, [memberId]);
 
   const lookupDelivery = async (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2213,8 +2239,29 @@ function OrdersPage() {
   return (
     <DashboardShell title="내 공동구매" description="참여한 공동구매의 결제와 배송 상태를 확인하세요." icon={<ShoppingBag />}>
       <div className="order-grid">
-        <article className="order-card"><div className="order-icon">🍊</div><div className="order-info"><Badge>모집 중</Badge><h3>제주 노지 감귤 5kg 산지직송</h3><p>참여일 2026.09.18 · 수량 1개</p><Progress value={88} className="order-progress" /><small>40명 중 35명 참여 · 마감까지 5시간 42분</small></div><strong>23,900원</strong></article>
-        <article className="order-card"><div className="order-icon green">🥬</div><div className="order-info"><Badge variant="secondary">배송 중</Badge><h3>무농약 쌈채소 정기 꾸러미</h3><p>주문번호 MM-260914-0281</p><small>택배사와 운송장 번호로 실시간 배송 위치를 확인하세요.</small></div><Button variant="outline" onClick={() => { setTrackingOpen(true); setTrackingError(''); }}>배송 조회</Button></article>
+        {participationsLoading && <div className="participation-state"><LoaderCircle className="animate-spin" size={22} /> 참여 내역을 불러오는 중입니다.</div>}
+        {!participationsLoading && participationsError && <div className="participation-state error">{participationsError}</div>}
+        {!participationsLoading && !participationsError && participations.length === 0 && <div className="participation-state"><ShoppingBag size={28} /><strong>아직 참여한 공동구매가 없습니다.</strong><span>마음에 드는 상품의 공동구매에 참여해 보세요.</span></div>}
+        {!participationsLoading && !participationsError && participations.map((participation) => {
+          const product = items.find((item) => item.id === participation.productId);
+          const rate = Math.min(100, Math.round((participation.joinedQuantity / participation.goalQuantity) * 100));
+          return (
+            <article className="order-card" key={participation.id}>
+              <div className={`order-icon ${product?.tone ?? 'green'}`}>{product?.emoji ?? '📦'}</div>
+              <div className="order-info">
+                <Badge variant={participation.goalReached ? 'secondary' : 'default'}>{participation.goalReached ? '목표 달성' : '모집 중'}</Badge>
+                <h3>{participation.productTitle}</h3>
+                <p>참여일 {participationDate(participation.participatedAt)} · 신청 수량 {participation.quantity}개</p>
+                <Progress value={rate} className="order-progress" />
+                <small>{participation.goalQuantity}개 중 {participation.joinedQuantity}개 참여 · {participation.goalReached ? '결제 일정 안내 예정' : `목표까지 ${participation.remainingQuantity}개`}</small>
+              </div>
+              <div className="order-card-actions">
+                {product && <strong>{won(product.price * participation.quantity)}</strong>}
+                {product && <Button variant="outline" size="sm" onClick={() => onOpenProduct(product.id)}>상품 보기</Button>}
+              </div>
+            </article>
+          );
+        })}
       </div>
 
       <Dialog open={trackingOpen} onOpenChange={setTrackingOpen}>
@@ -2269,9 +2316,27 @@ function SellerDashboard({ products: items, onManageProduct, onCreateProduct }: 
 
 function SellerProductManagement({ product, onBack, onSave }: { product: Product; onBack: () => void; onSave: () => void }) {
   const isGroupBuy = product.saleType === 'GROUP_BUY';
+  const [participations, setParticipations] = useState<SellerGroupBuyParticipation[]>([]);
+  const [participationsLoading, setParticipationsLoading] = useState(isGroupBuy);
+  const [participationsError, setParticipationsError] = useState('');
   const rate = Math.min(100, Math.round((product.joined / product.target) * 100));
   const remaining = Math.max(0, product.target - product.joined);
   const detail = productDetails[product.id] ?? { description: '새로 등록한 상품입니다.', origin: '미입력', delivery: '모집 완료 후 안내', shipping: '상품별 안내', highlights: [] };
+
+  useEffect(() => {
+    if (!isGroupBuy) return;
+    let active = true;
+    void fetch(`${API_BASE_URL}/api/group-buys/${product.id}/participations`)
+      .then(async (response) => {
+        const result = await response.json().catch(() => ({})) as SellerGroupBuyParticipation[] & { message?: string };
+        if (!response.ok) throw new Error(result.message ?? '참여자 현황을 불러오지 못했습니다.');
+        return result;
+      })
+      .then((result) => { if (active) setParticipations(result); })
+      .catch((error) => { if (active) setParticipationsError(error instanceof Error ? error.message : '참여자 현황을 불러오지 못했습니다.'); })
+      .finally(() => { if (active) setParticipationsLoading(false); });
+    return () => { active = false; };
+  }, [isGroupBuy, product.id]);
 
   const saveProduct = (event: SyntheticEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2322,8 +2387,12 @@ function SellerProductManagement({ product, onBack, onSave }: { product: Product
         </section>
 
         <section className="seller-order-card">
-          <div className="seller-setting-title"><div><h2>최근 참여 현황</h2><p>가장 최근에 참여한 주문 내역입니다.</p></div><Users /></div>
-          {[['김모임', '2개', '결제 완료'], ['이구매', '1개', '결제 완료'], ['박함께', '3개', '입금 확인']].map(([name, quantity, status], index) => <div className="seller-order-row" key={name}><span className="seller-order-avatar">{name.charAt(0)}</span><div><strong>{name}</strong><p>MM-260929-{1024 - index} · {quantity}</p></div><Badge variant="secondary">{status}</Badge></div>)}
+          <div className="seller-setting-title"><div><h2>최근 참여 현황</h2><p>{isGroupBuy ? `총 ${participations.length}명의 실제 공동구매 신청 내역입니다.` : '공동구매 상품의 참여 신청을 확인할 수 있습니다.'}</p></div><Users /></div>
+          {!isGroupBuy && <div className="participation-state compact">한정판매 주문 내역은 결제 완료 후 주문 관리에서 확인할 수 있습니다.</div>}
+          {isGroupBuy && participationsLoading && <div className="participation-state compact"><LoaderCircle className="animate-spin" size={20} /> 참여자 현황을 불러오는 중입니다.</div>}
+          {isGroupBuy && !participationsLoading && participationsError && <div className="participation-state compact error">{participationsError}</div>}
+          {isGroupBuy && !participationsLoading && !participationsError && participations.length === 0 && <div className="participation-state compact">아직 공동구매 참여자가 없습니다.</div>}
+          {isGroupBuy && !participationsLoading && !participationsError && participations.map((participation) => <div className="seller-order-row" key={participation.id}><span className="seller-order-avatar">{participation.memberName.charAt(0) || '회'}</span><div><strong>{participation.memberName}</strong><p>회원 #{participation.memberId} · {participation.quantity}개 · {participationDate(participation.participatedAt)}</p></div><Badge variant="secondary">신청 완료</Badge></div>)}
         </section>
 
         <div className="seller-manage-actions"><Button type="button" variant="outline" onClick={onBack}>취소</Button><Button type="submit">변경사항 저장</Button></div>

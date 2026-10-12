@@ -1,20 +1,29 @@
 package com.livegroupbuy.backend.groupbuy;
 
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import com.livegroupbuy.backend.member.Member;
+import com.livegroupbuy.backend.member.MemberRepository;
 
 @Service
 public class GroupBuyService {
 
     private final GroupBuyCampaignRepository campaignRepository;
     private final GroupBuyParticipationRepository participationRepository;
+    private final MemberRepository memberRepository;
 
     public GroupBuyService(GroupBuyCampaignRepository campaignRepository,
-                           GroupBuyParticipationRepository participationRepository) {
+                           GroupBuyParticipationRepository participationRepository,
+                           MemberRepository memberRepository) {
         this.campaignRepository = campaignRepository;
         this.participationRepository = participationRepository;
+        this.memberRepository = memberRepository;
     }
 
     @Transactional(readOnly = true)
@@ -52,6 +61,41 @@ public class GroupBuyService {
                 ? "목표 수량을 달성했습니다. 참여자에게 결제 일정을 안내합니다."
                 : "공동구매 참여 신청이 완료되었습니다. 목표 달성 전에는 결제되지 않습니다.";
         return GroupBuyCampaignResponse.from(campaign, message);
+    }
+
+    @Transactional(readOnly = true)
+    public List<BuyerGroupBuyParticipationResponse> participationsForMember(Long memberId) {
+        if (!memberRepository.existsById(memberId)) {
+            throw new IllegalArgumentException("회원 정보를 찾을 수 없습니다.");
+        }
+        return participationRepository.findAllByMemberIdOrderByCreatedAtDesc(memberId).stream()
+                .map(participation -> {
+                    GroupBuyCampaign campaign = campaignRepository.findById(participation.getProductId())
+                            .orElseThrow(() -> new IllegalStateException("공동구매 상품 정보를 찾을 수 없습니다."));
+                    return BuyerGroupBuyParticipationResponse.from(participation, campaign);
+                })
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<SellerGroupBuyParticipationResponse> participationsForProduct(Long productId) {
+        if (!campaignRepository.existsById(productId)) {
+            throw new IllegalArgumentException("공동구매 상품 정보를 찾을 수 없습니다.");
+        }
+        List<GroupBuyParticipation> participations =
+                participationRepository.findAllByProductIdOrderByCreatedAtDesc(productId);
+        Map<Long, Member> members = memberRepository.findAllById(
+                        participations.stream().map(GroupBuyParticipation::getMemberId).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(Member::getId, Function.identity()));
+
+        return participations.stream()
+                .map(participation -> SellerGroupBuyParticipationResponse.from(
+                        participation,
+                        members.containsKey(participation.getMemberId())
+                                ? members.get(participation.getMemberId()).getName()
+                                : "탈퇴한 회원"))
+                .toList();
     }
 
     private static String statusMessage(GroupBuyCampaign campaign) {
