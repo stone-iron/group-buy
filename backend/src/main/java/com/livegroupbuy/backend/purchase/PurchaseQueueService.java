@@ -9,8 +9,25 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
+/**
+ * 한정 수량 구매 대기열.
+ *
+ * <p><b>잠금 규칙</b></p>
+ * <ul>
+ *   <li>재고를 바꾸는 트랜잭션은 READ COMMITTED로 실행한다. MySQL 기본값인 REPEATABLE READ에서는
+ *       첫 조회 시점의 스냅샷을 계속 읽기 때문에, 재고 잠금을 기다리는 동안 다른 요청이 만든 티켓을 보지 못해
+ *       1인 요청 제한이 우회된다. 또 범위 잠금(gap lock)이 INSERT를 막아 데드락이 생긴다.</li>
+ *   <li>중복·한도 확인은 반드시 재고 잠금을 얻은 <i>뒤에</i> 한다. 같은 상품의 요청은 재고 잠금 앞에서 줄을 서므로
+ *       뒤 요청은 앞 요청이 커밋한 티켓을 확인할 수 있다.</li>
+ *   <li>대기열 처리는 상품마다 별도 트랜잭션으로 실행해, 한 번에 하나의 재고 잠금만 보유한다.</li>
+ * </ul>
+ */
 @Service
 public class PurchaseQueueService {
 
@@ -26,29 +43,38 @@ public class PurchaseQueueService {
     private final PurchaseTicketRepository ticketRepository;
     private final ProductInventoryRepository inventoryRepository;
     private final PurchasePenaltyService penaltyService;
+    private final TransactionTemplate productTransaction;
     private final long reservationSeconds;
     private final int maxPerMember;
 
     public PurchaseQueueService(PurchaseTicketRepository ticketRepository,
                                 ProductInventoryRepository inventoryRepository,
                                 PurchasePenaltyService penaltyService,
+                                PlatformTransactionManager transactionManager,
                                 @Value("${purchase.queue.reservation-seconds:300}") long reservationSeconds,
                                 @Value("${purchase.queue.max-per-member:3}") int maxPerMember) {
         this.ticketRepository = ticketRepository;
         this.inventoryRepository = inventoryRepository;
         this.penaltyService = penaltyService;
+        this.productTransaction = new TransactionTemplate(transactionManager);
+        this.productTransaction.setIsolationLevel(TransactionDefinition.ISOLATION_READ_COMMITTED);
         this.reservationSeconds = reservationSeconds;
         this.maxPerMember = maxPerMember;
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PurchaseQueueResponse enqueue(PurchaseQueueRequest request) {
         penaltyService.assertParticipationAllowed(request.memberId());
+        // 이미 처리된 재요청은 잠금 없이 바로 돌려준다.
         PurchaseTicket existing = ticketRepository.findByRequestKey(request.requestKey()).orElse(null);
         if (existing != null) return response(existing);
 
         inventoryRepository.findByIdForUpdate(request.productId())
                 .orElseThrow(() -> new IllegalArgumentException("구매할 수 없는 상품입니다."));
+
+        // 잠금을 기다리는 동안 같은 requestKey의 앞선 요청이 티켓을 만들었을 수 있다.
+        existing = ticketRepository.findByRequestKey(request.requestKey()).orElse(null);
+        if (existing != null) return response(existing);
 
         PurchaseTicket activeTicket = ticketRepository
                 .findFirstByProductIdAndMemberIdAndStatusInOrderByIdDesc(
@@ -72,9 +98,9 @@ public class PurchaseQueueService {
             ));
             return response(ticket);
         } catch (DataIntegrityViolationException duplicateRequest) {
-            return ticketRepository.findByRequestKey(request.requestKey())
-                    .map(this::response)
-                    .orElseThrow(() -> duplicateRequest);
+            // 같은 상품의 중복 요청은 위에서 걸러지므로, 여기 오는 것은 다른 상품에 이미 쓰인 requestKey뿐이다.
+            // INSERT가 실패한 Hibernate 세션은 다시 쓸 수 없으므로 조회하지 않고 바로 거절한다.
+            throw new IllegalArgumentException("이미 다른 구매 요청에 사용된 요청 키입니다.", duplicateRequest);
         }
     }
 
@@ -103,7 +129,8 @@ public class PurchaseQueueService {
         )));
     }
 
-    @Transactional
+    /** 잠금 순서: 티켓 → 재고 (취소·만료 처리와 같은 순서) */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PurchaseQueueResponse confirmPaidReservation(Long ticketId, Long memberId) {
         PurchaseTicket ticket = ticketRepository.findLockedById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("대기열 요청을 찾을 수 없습니다."));
@@ -129,7 +156,8 @@ public class PurchaseQueueService {
         return response(ticket);
     }
 
-    @Transactional
+    /** 잠금 순서: 티켓 → 재고 */
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PurchaseQueueResponse cancel(Long ticketId, PurchaseCancelRequest request) {
         PurchaseTicket ticket = ticketRepository.findLockedById(ticketId)
                 .orElseThrow(() -> new IllegalArgumentException("대기열 요청을 찾을 수 없습니다."));
@@ -158,46 +186,58 @@ public class PurchaseQueueService {
         return response(ticket);
     }
 
+    /**
+     * 상품마다 별도 트랜잭션으로 만료 처리와 순번 배정을 한다.
+     * 한 트랜잭션이 여러 상품의 재고 잠금을 동시에 쥐지 않으므로, 결제·취소와 잠금 순서가 엇갈리지 않는다.
+     * 한 상품에서 오류가 나도 다른 상품은 계속 처리하고, 오류는 마지막에 다시 던져 기록되게 한다.
+     */
     @Scheduled(fixedDelayString = "${purchase.queue.process-delay-ms:450}")
-    @Transactional
     public void processNext() {
-        expireReservations();
+        RuntimeException firstFailure = null;
         for (Long productId : inventoryRepository.findAllProductIds()) {
-            ProductInventory inventory = inventoryRepository.findByIdForUpdate(productId).orElse(null);
-            if (inventory == null) continue;
-
-            while (true) {
-                PurchaseTicket ticket = ticketRepository
-                        .findFirstByProductIdAndStatusOrderByIdAsc(productId, PurchaseStatus.WAITING)
-                        .orElse(null);
-                if (ticket == null || ticket.getStatus() != PurchaseStatus.WAITING) break;
-
-                ticket.startProcessing();
-                if (inventory.remainingQuantity() < ticket.getQuantity()) {
-                    ticket.rejectAsSoldOut();
-                    continue;
-                }
-                if (inventory.reserve(ticket.getQuantity())) {
-                    ticket.reserveUntil(LocalDateTime.now().plusSeconds(reservationSeconds));
-                    continue;
-                }
-
-                // 남은 재고는 있지만 앞선 구매자들이 결제 중이면 현재 순번을 그대로 유지한다.
-                ticket.returnToWaiting();
-                break;
+            try {
+                productTransaction.executeWithoutResult(status -> processProduct(productId));
+            } catch (RuntimeException exception) {
+                log.warn("Failed to process purchase queue for product {}: {}", productId, exception.getMessage());
+                if (firstFailure == null) firstFailure = exception;
             }
         }
+        if (firstFailure != null) throw firstFailure;
     }
 
-    private void expireReservations() {
-        List<PurchaseTicket> expired = ticketRepository.findAllByStatusAndExpiresAtBeforeOrderByIdAsc(
-                PurchaseStatus.RESERVED, LocalDateTime.now()
+    /** 잠금 순서: 만료된 티켓 → 재고 → 대기 티켓 */
+    private void processProduct(Long productId) {
+        List<PurchaseTicket> expired = ticketRepository.findAllByProductIdAndStatusAndExpiresAtBeforeOrderByIdAsc(
+                productId, PurchaseStatus.RESERVED, LocalDateTime.now()
         );
+        ProductInventory inventory = inventoryRepository.findByIdForUpdate(productId).orElse(null);
+        if (inventory == null) return;
+
         for (PurchaseTicket ticket : expired) {
-            ProductInventory inventory = inventoryRepository.findByIdForUpdate(ticket.getProductId()).orElse(null);
-            if (inventory != null) inventory.releaseReservation(ticket.getQuantity());
+            inventory.releaseReservation(ticket.getQuantity());
             ticket.expire();
             recordUnpaidExpirationSafely(ticket.getMemberId());
+        }
+
+        while (true) {
+            PurchaseTicket ticket = ticketRepository
+                    .findFirstByProductIdAndStatusOrderByIdAsc(productId, PurchaseStatus.WAITING)
+                    .orElse(null);
+            if (ticket == null || ticket.getStatus() != PurchaseStatus.WAITING) break;
+
+            ticket.startProcessing();
+            if (inventory.remainingQuantity() < ticket.getQuantity()) {
+                ticket.rejectAsSoldOut();
+                continue;
+            }
+            if (inventory.reserve(ticket.getQuantity())) {
+                ticket.reserveUntil(LocalDateTime.now().plusSeconds(reservationSeconds));
+                continue;
+            }
+
+            // 남은 재고는 있지만 앞선 구매자들이 결제 중이면 현재 순번을 그대로 유지한다.
+            ticket.returnToWaiting();
+            break;
         }
     }
 

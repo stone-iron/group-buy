@@ -7,6 +7,7 @@ import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -44,7 +45,7 @@ public class TossPaymentService {
         this.secretKey = secretKey;
     }
 
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public TossPaymentPrepareResponse prepare(TossPaymentPrepareRequest request) {
         requireSecretKey();
         PurchaseTicket ticket = ticketRepository.findLockedById(request.ticketId())
@@ -84,7 +85,8 @@ public class TossPaymentService {
         return TossPaymentPrepareResponse.from(order);
     }
 
-    @Transactional
+    // 잠금 순서: 결제 주문 → 티켓 → 재고. 바깥 트랜잭션의 격리 수준이 confirmPaidReservation에도 적용된다.
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public PurchaseQueueResponse confirm(TossPaymentConfirmRequest request) {
         requireSecretKey();
         TossPaymentOrder order = paymentRepository.findLockedByOrderId(request.orderId())

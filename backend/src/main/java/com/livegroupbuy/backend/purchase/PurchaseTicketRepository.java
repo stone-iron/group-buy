@@ -28,7 +28,9 @@ public interface PurchaseTicketRepository extends JpaRepository<PurchaseTicket, 
     Optional<PurchaseTicket> findLockedById(@Param("id") Long id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    List<PurchaseTicket> findAllByStatusAndExpiresAtBeforeOrderByIdAsc(PurchaseStatus status, LocalDateTime expiresAt);
+    List<PurchaseTicket> findAllByProductIdAndStatusAndExpiresAtBeforeOrderByIdAsc(
+            Long productId, PurchaseStatus status, LocalDateTime expiresAt
+    );
 
     long countByStatusInAndProductIdAndIdLessThan(Collection<PurchaseStatus> statuses, Long productId, Long id);
 
