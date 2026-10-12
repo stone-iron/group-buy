@@ -1856,7 +1856,7 @@ function LiveCommercePage({ role, currentUserName, broadcasts, subscribedLiveIds
           <div className="live-stream-field"><span><small>서버</small><code>{OBS_SERVER_URL}</code></span><Button type="button" variant="outline" size="sm" onClick={() => void copyStreamValue(OBS_SERVER_URL, '서버 주소')}>복사</Button></div>
           <div className="live-stream-field"><span><small>스트림 키</small><code>{preparingBroadcast ? streamKeyFor(preparingBroadcast) : ''}</code></span><Button type="button" variant="outline" size="sm" onClick={() => preparingBroadcast && void copyStreamValue(streamKeyFor(preparingBroadcast), '스트림 키')}>복사</Button></div>
           <ol className="live-prep-steps"><li>OBS의 설정 → 방송에서 서비스는 사용자 지정으로 선택하세요.</li><li>위 서버 주소와 스트림 키를 붙여넣고 OBS의 방송 시작을 누르세요.</li><li>영상 송출을 확인한 뒤 아래 라이브 시작을 누르세요.</li></ol>
-          <div className="live-preview-address"><Radio size={16} /><span>구매자 영상 주소</span><code>{preparingBroadcast ? `${LIVE_PLAYER_BASE_URL}/${streamKeyFor(preparingBroadcast)}` : ''}</code></div>
+          <div className="live-preview-address"><Radio size={16} /><span>구매자 영상 주소</span><code>{preparingBroadcast ? `${LIVE_PLAYER_BASE_URL}/${streamKeyFor(preparingBroadcast)}/` : ''}</code></div>
           <DialogFooter>
             <DialogClose render={<Button variant="outline" />}>나중에</DialogClose>
             <Button className="live-start-button" onClick={() => { if (!preparingBroadcast) return; onStart(preparingBroadcast.id); setPreparingBroadcastId(null); }}><Radio size={16} /> 라이브 시작</Button>
@@ -1992,7 +1992,7 @@ function LiveStudioPage({ broadcast, product, onBack, onEnd, onNotice }: { broad
 
       <div className="live-studio-grid">
         <section className="live-studio-preview">
-          <iframe src={`${LIVE_PLAYER_BASE_URL}/${streamKeyFor(broadcast)}?autoplay=true&muted=true&controls=true`} title={`${broadcast.title} 판매자 미리보기`} allow="autoplay; fullscreen" />
+          <iframe src={`${LIVE_PLAYER_BASE_URL}/${streamKeyFor(broadcast)}/?autoplay=true&muted=true&controls=true`} title={`${broadcast.title} 판매자 미리보기`} allow="autoplay; fullscreen" />
           <div><span><Video size={16} /> 판매자 미리보기 · 음소거</span><span><Users size={16} /> {broadcast.viewers.toLocaleString('ko-KR')}명 시청 중</span></div>
         </section>
 
@@ -2113,7 +2113,7 @@ function LiveWatchPage({ broadcast, broadcasts, product, products: liveProducts,
       <div className="live-watch-grid">
         <main className="live-stage-area" onWheel={handleBroadcastWheel}>
           <section className="live-player">
-            <iframe src={`${LIVE_PLAYER_BASE_URL}/${streamKeyFor(broadcast)}?autoplay=true&muted=${isMuted}&controls=true`} title={`${broadcast.title} 실시간 방송`} allow="autoplay; fullscreen" />
+            <iframe src={`${LIVE_PLAYER_BASE_URL}/${streamKeyFor(broadcast)}/?autoplay=true&muted=${isMuted}&controls=true`} title={`${broadcast.title} 실시간 방송`} allow="autoplay; fullscreen" />
             <Badge className="live-badge"><i /> LIVE</Badge>
             {broadcasts.length > 1 && <div className="live-wheel-capture" onWheel={handleBroadcastWheel} aria-hidden="true" />}
             <div className="live-player-overlay"><strong>{broadcast.seller}</strong><span><Users size={15} /> {broadcast.viewers.toLocaleString('ko-KR')}명</span></div>
