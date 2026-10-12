@@ -2026,6 +2026,7 @@ function LiveWatchPage({ broadcast, broadcasts, product, products: liveProducts,
   const [sideTab, setSideTab] = useState<'products' | 'intro' | 'benefits'>('products');
   const [likedBroadcastIds, setLikedBroadcastIds] = useState<Set<number>>(() => new Set());
   const [isMuted, setIsMuted] = useState(false);
+  const playerFrameRef = useRef<HTMLIFrameElement>(null);
   const wheelLockedRef = useRef(false);
   const currentBroadcastIndex = broadcasts.findIndex((item) => item.id === broadcast.id);
   const hasPreviousBroadcast = currentBroadcastIndex > 0;
@@ -2090,8 +2091,11 @@ function LiveWatchPage({ broadcast, broadcasts, product, products: liveProducts,
   };
 
   const toggleMute = () => {
-    setIsMuted((current) => !current);
-    onNotice(isMuted ? '방송 음량을 켰습니다.' : '방송을 음소거했습니다.');
+    const nextMuted = !isMuted;
+    const video = playerFrameRef.current?.contentDocument?.querySelector<HTMLVideoElement>('video');
+    if (video) video.muted = nextMuted;
+    setIsMuted(nextMuted);
+    onNotice(nextMuted ? '방송을 음소거했습니다.' : '방송 음량을 켰습니다.');
   };
 
   const sendMessage = (event: SyntheticEvent<HTMLFormElement>) => {
@@ -2113,7 +2117,7 @@ function LiveWatchPage({ broadcast, broadcasts, product, products: liveProducts,
       <div className="live-watch-grid">
         <main className="live-stage-area" onWheel={handleBroadcastWheel}>
           <section className="live-player">
-            <iframe src={`${LIVE_PLAYER_BASE_URL}/${streamKeyFor(broadcast)}/?autoplay=true&muted=${isMuted}&controls=true`} title={`${broadcast.title} 실시간 방송`} allow="autoplay; fullscreen" />
+            <iframe ref={playerFrameRef} src={`${LIVE_PLAYER_BASE_URL}/${streamKeyFor(broadcast)}/?autoplay=true&muted=false&controls=true`} title={`${broadcast.title} 실시간 방송`} allow="autoplay; fullscreen" onLoad={() => { const video = playerFrameRef.current?.contentDocument?.querySelector<HTMLVideoElement>('video'); if (video) video.muted = isMuted; }} />
             <Badge className="live-badge"><i /> LIVE</Badge>
             {broadcasts.length > 1 && <div className="live-wheel-capture" onWheel={handleBroadcastWheel} aria-hidden="true" />}
             <div className="live-player-overlay"><strong>{broadcast.seller}</strong><span><Users size={15} /> {broadcast.viewers.toLocaleString('ko-KR')}명</span></div>
