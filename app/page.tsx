@@ -201,6 +201,20 @@ const appNotifications = [
 const initialLiveBroadcasts: LiveBroadcast[] = [];
 
 const won = (value: number) => `${value.toLocaleString('ko-KR')}원`;
+
+function createRequestKey() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('');
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
 const MAX_PURCHASE_PER_MEMBER = 3;
 const roleLabels: Record<Role, string> = {
   buyer: '구매자',
@@ -717,7 +731,7 @@ export default function Home() {
           productId: id,
           memberId: currentUser.id,
           quantity,
-          requestKey: crypto.randomUUID(),
+          requestKey: createRequestKey(),
         }),
       });
       const result = await response.json().catch(() => ({})) as PurchaseQueueTicket & { message?: string };
@@ -1053,7 +1067,7 @@ export default function Home() {
         const response = await fetch(`${API_BASE_URL}/api/purchase-queue`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId, memberId: 0, quantity: 1, requestKey: crypto.randomUUID() }),
+          body: JSON.stringify({ productId, memberId: 0, quantity: 1, requestKey: createRequestKey() }),
         });
         const result = await response.json().catch(() => ({})) as PurchaseQueueTicket & { message?: string };
         if (!response.ok) throw new Error(result.message ?? '구매 대기열에 접수하지 못했습니다.');
