@@ -62,34 +62,74 @@ flowchart LR
 
 요청 제한은 Redis Lua Script로 카운트 증가와 만료 시간 설정을 원자적으로 처리합니다. 사용자가 직접 취소한 요청과 결제 실패는 미결제 패널티에 포함하지 않습니다.
 
-메인 화면
-<p align="center"> <img src="docs/images/buyer-home.png" alt="여기모여 메인 화면" width="360"> </p>
+## 메인 화면
 
-추천 기획전 배너와 함께 지금 참여 중인 인원, 오늘 마감되는 공동구매, 평균 할인율, 배송 현황을 한눈에 보여줍니다.
+<table>
+  <tr>
+    <th width="300">화면</th>
+    <th>기능 설명</th>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/buyer-home.png" alt="여기모여 메인 화면" width="280"></td>
+    <td><b>메인 화면</b><br><br>추천 기획전 배너와 함께 지금 참여 중인 인원, 오늘 마감되는 공동구매, 평균 할인율, 배송 현황을 한눈에 보여줍니다.</td>
+  </tr>
+</table>
 
-주요 화면
-한정판매 구매 흐름
-화면	기능 설명
-<img src="docs/images/product-detail.png" alt="한정판매 상세" width="280">	한정판매 상세
-선착순 한정판매 상품의 정보와 평점, 후기를 확인하고 찜하거나 구매 대기열에 참여합니다.
-<img src="docs/images/purchase-queue.png" alt="FIFO 구매 대기열" width="280">	FIFO 구매 대기열
-구매 요청마다 티켓을 발급하고 현재 순번, 앞선 대기 수, 남은 수량, 1인 추가 구매 가능 수량을 실시간으로 보여줍니다.
-<img src="docs/images/inventory-reserved.png" alt="재고 임시 확보" width="280">	재고 임시 확보
-순번이 되면 구매 수량을 5분간 확보합니다. 시간 안에 결제하지 않거나 취소하면 다음 순번에게 자동으로 넘어갑니다.
-<img src="docs/images/shipping-checkout.png" alt="배송정보 입력" width="280">	배송정보 입력과 결제
-주소 검색으로 배송지를 입력하고 결제 금액을 확인한 뒤 Toss Payments로 결제합니다. 서버가 금액과 예약 상태를 다시 검증한 뒤 구매를 확정합니다.
-<img src="docs/images/rate-limit.png" alt="반복 요청 제한" width="280">	반복 요청 제한
-짧은 시간에 구매 요청을 반복하면 Redis 기반 속도 제한으로 차단하고, 다시 시도할 수 있는 시간을 안내합니다.
-라이브커머스와 운영 화면
-화면	기능 설명
-<img src="docs/images/live-commerce.png" alt="라이브커머스" width="280">	라이브커머스
-진행 중인 라이브 방송과 시청자 수를 확인하고, 방송을 보며 실시간 채팅으로 판매자와 소통합니다. 판매자는 이 화면에서 라이브 방송을 신청합니다.
-<img src="docs/images/seller-center.png" alt="판매자센터" width="280">	판매자센터
-공동구매와 한정판매 상품의 진행 현황과 마감 시간을 관리하고, 배송 준비 건수와 정산 예정 금액을 확인합니다.
-<img src="docs/images/admin-center.png" alt="관리자센터" width="280">	관리자센터
-오늘 거래액, 신규 회원, 판매자 승인 대기, 신고 현황을 확인하고 판매자 입점 신청을 검토합니다.
-<img src="docs/images/admin-live-approval.png" alt="방송 승인 대기" width="280">	방송 승인 관리
-판매자가 신청한 방송 일정과 상품을 검토해 승인하거나 반려합니다.
+## 주요 화면
+
+### 한정판매 구매 흐름
+
+<table>
+  <tr>
+    <th width="300">화면</th>
+    <th>기능 설명</th>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/product-detail.png" alt="한정판매 상세" width="280"></td>
+    <td><b>한정판매 상세</b><br><br>선착순 한정판매 상품의 정보와 평점, 후기를 확인하고 찜하거나 구매 대기열에 참여합니다.</td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/purchase-queue.png" alt="FIFO 구매 대기열" width="280"></td>
+    <td><b>FIFO 구매 대기열</b><br><br>구매 요청마다 티켓을 발급하고 현재 순번, 앞선 대기 수, 남은 수량, 1인 추가 구매 가능 수량을 실시간으로 보여줍니다.</td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/inventory-reserved.png" alt="재고 임시 확보" width="280"></td>
+    <td><b>재고 임시 확보</b><br><br>순번이 되면 구매 수량을 5분간 확보합니다. 시간 안에 결제하지 않거나 취소하면 다음 순번에게 자동으로 넘어갑니다.</td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/shipping-checkout.png" alt="배송정보 입력" width="280"></td>
+    <td><b>배송정보 입력과 결제</b><br><br>주소 검색으로 배송지를 입력하고 결제 금액을 확인한 뒤 Toss Payments로 결제합니다. 서버가 금액과 예약 상태를 다시 검증한 뒤 구매를 확정합니다.</td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/rate-limit.png" alt="반복 요청 제한" width="280"></td>
+    <td><b>반복 요청 제한</b><br><br>짧은 시간에 구매 요청을 반복하면 Redis 기반 속도 제한으로 차단하고, 다시 시도할 수 있는 시간을 안내합니다.</td>
+  </tr>
+</table>
+
+### 라이브커머스와 운영 화면
+
+<table>
+  <tr>
+    <th width="300">화면</th>
+    <th>기능 설명</th>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/live-commerce.png" alt="라이브커머스" width="280"></td>
+    <td><b>라이브커머스</b><br><br>진행 중인 라이브 방송과 시청자 수를 확인하고, 방송을 보며 실시간 채팅으로 판매자와 소통합니다. 판매자는 이 화면에서 라이브 방송을 신청합니다.</td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/seller-center.png" alt="판매자센터" width="280"></td>
+    <td><b>판매자센터</b><br><br>공동구매와 한정판매 상품의 진행 현황과 마감 시간을 관리하고, 배송 준비 건수와 정산 예정 금액을 확인합니다.</td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/admin-center.png" alt="관리자센터" width="280"></td>
+    <td><b>관리자센터</b><br><br>오늘 거래액, 신규 회원, 판매자 승인 대기, 신고 현황을 확인하고 판매자 입점 신청을 검토합니다.</td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/admin-live-approval.png" alt="방송 승인 관리" width="280"></td>
+    <td><b>방송 승인 관리</b><br><br>판매자가 신청한 방송 일정과 상품을 검토해 승인하거나 반려합니다.</td>
+  </tr>
+</table>
 
 ## 주요 기능
 
