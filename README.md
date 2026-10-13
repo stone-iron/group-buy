@@ -50,66 +50,150 @@ Redis 장애 대응	Fail-open 후 DB 락과 수량 제한으로 재고 정합성
 
 요청 제한은 Redis Lua Script로 카운트 증가와 만료 시간 설정을 원자적으로 처리합니다. 사용자가 직접 취소한 요청과 결제 실패는 미결제 패널티에 포함하지 않습니다.
 
-메인 화면
-<table width="100%"> <tr> <th width="300">화면</th> <th>기능 설명</th> </tr> <tr> <td align="center" width="300"><img src="docs/images/buyer-home.png" alt="여기모여 메인 화면" width="280"></td> <td><details><summary><b>메인 화면</b></summary><br>추천 기획전 배너와 함께 지금 참여 중인 인원, 오늘 마감되는 공동구매, 평균 할인율, 배송 현황을 한눈에 보여줍니다.</details></td> </tr> </table>
-주요 화면
-한정판매 구매 흐름
-<table width="100%"> <tr> <th width="300">화면</th> <th>기능 설명</th> </tr> <tr> <td align="center" width="300"><img src="docs/images/product-detail.png" alt="한정판매 상세" width="280"></td> <td><details><summary><b>한정판매 상세</b></summary><br>선착순 한정판매 상품의 정보와 평점, 후기를 확인하고 찜하거나 구매 대기열에 참여합니다.</details></td> </tr> <tr> <td align="center" width="300"><img src="docs/images/purchase-queue.png" alt="FIFO 구매 대기열" width="280"></td> <td><details><summary><b>FIFO 구매 대기열</b></summary><br>구매 요청마다 티켓을 발급하고 현재 순번, 앞선 대기 수, 남은 수량, 1인 추가 구매 가능 수량을 실시간으로 보여줍니다.</details></td> </tr> <tr> <td align="center" width="300"><img src="docs/images/inventory-reserved.png" alt="재고 임시 확보" width="280"></td> <td><details><summary><b>재고 임시 확보</b></summary><br>순번이 되면 구매 수량을 5분간 확보합니다. 시간 안에 결제하지 않거나 취소하면 다음 순번에게 자동으로 넘어갑니다.</details></td> </tr> <tr> <td align="center" width="300"><img src="docs/images/shipping-checkout.png" alt="배송정보 입력" width="280"></td> <td><details><summary><b>배송정보 입력과 결제</b></summary><br>주소 검색으로 배송지를 입력하고 결제 금액을 확인한 뒤 Toss Payments로 결제합니다. 서버가 금액과 예약 상태를 다시 검증한 뒤 구매를 확정합니다.</details></td> </tr> <tr> <td align="center" width="300"><img src="docs/images/rate-limit.png" alt="반복 요청 제한" width="280"></td> <td><details><summary><b>반복 요청 제한</b></summary><br>짧은 시간에 구매 요청을 반복하면 Redis 기반 속도 제한으로 차단하고, 다시 시도할 수 있는 시간을 안내합니다.</details></td> </tr> </table>
-라이브커머스와 운영 화면
-<table width="100%"> <tr> <th width="300">화면</th> <th>기능 설명</th> </tr> <tr> <td align="center" width="300"><img src="docs/images/live-commerce.png" alt="라이브커머스" width="280"></td> <td><details><summary><b>라이브커머스</b></summary><br>진행 중인 라이브 방송과 시청자 수를 확인하고, 방송을 보며 실시간 채팅으로 판매자와 소통합니다. 판매자는 이 화면에서 라이브 방송을 신청합니다.</details></td> </tr> <tr> <td align="center" width="300"><img src="docs/images/seller-center.png" alt="판매자센터" width="280"></td> <td><details><summary><b>판매자센터</b></summary><br>공동구매와 한정판매 상품의 진행 현황과 마감 시간을 관리하고, 배송 준비 건수와 정산 예정 금액을 확인합니다.</details></td> </tr> <tr> <td align="center" width="300"><img src="docs/images/admin-center.png" alt="관리자센터" width="280"></td> <td><details><summary><b>관리자센터</b></summary><br>오늘 거래액, 신규 회원, 판매자 승인 대기, 신고 현황을 확인하고 판매자 입점 신청을 검토합니다.</details></td> </tr> <tr> <td align="center" width="300"><img src="docs/images/admin-live-approval.png" alt="방송 승인 관리" width="280"></td> <td><details><summary><b>방송 승인 관리</b></summary><br>판매자가 신청한 방송 일정과 상품을 검토해 승인하거나 반려합니다.</details></td> </tr> </table>
-주요 기능
-구매자
-공동구매 및 한정판매 상품 조회·찜
-구매 대기열 접수와 실시간 순번 확인
-배송정보 입력 후 Toss Payments 결제
-라이브 방송 시청 및 WebSocket 실시간 채팅
-방송 알림 신청과 배송 조회
-Google·Kakao·Naver 소셜 로그인
-판매자
-공동구매·한정판매 상품 및 주문 현황 관리
-라이브 방송 일정 신청과 승인 상태 확인
-OBS 송출 정보 확인 및 방송 상태 관리
-배송·정산 현황 확인
-관리자
-판매자 입점 검토
-라이브 방송 승인·반려와 반려 사유 관리
-거래·회원·신고 현황 확인
-시스템 구성
-구매자·판매자·관리자
-React 19 / TypeScript
-Spring Boot REST API
-Spring WebSocket 채팅
-MySQL
-Redis 7
-Toss Payments
-배송조회 API
-Google·Kakao·NaverOAuth2
-OBS Studio
-MediaMTX
-기술 스택
-Backend
-Java 25, Spring Boot 4.1
-Spring Data JPA, Spring Security, OAuth2 Client
-Spring WebSocket, Bean Validation
-Maven
-Frontend
-React 19, TypeScript 5
-Vite 8, Vinext
-Tailwind CSS 4, shadcn UI, Base UI
-Data and Infrastructure
-MySQL, Redis 7
-Docker, MediaMTX, OBS Studio
-External API
-Toss Payments
-Google·Kakao·Naver OAuth2
-주소 검색 API
-배송 조회 API
-테스트
-PurchaseQueueConcurrencyTest: 동시 구매 요청에서 한정 수량만 예약되는지 검증
-GroupBuyConcurrencyTest: 동시 참여 요청에서도 공동구매 참여 수량이 정확하게 증가하는지 검증
-MemberServiceTest: 회원 가입과 인증 관련 서비스 로직 검증
-HealthControllerTest: 백엔드 상태 확인 API 검증
-bash
+## 메인 화면
+
+<table width="100%">
+  <tr>
+    <th width="300">화면</th>
+    <th>기능 설명</th>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/buyer-home.png" alt="여기모여 메인 화면" width="280"></td>
+    <td><details><summary><b>메인 화면</b></summary><br>추천 기획전 배너와 함께 지금 참여 중인 인원, 오늘 마감되는 공동구매, 평균 할인율, 배송 현황을 한눈에 보여줍니다.</details></td>
+  </tr>
+</table>
+
+## 주요 화면
+
+### 한정판매 구매 흐름
+
+<table width="100%">
+  <tr>
+    <th width="300">화면</th>
+    <th>기능 설명</th>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/product-detail.png" alt="한정판매 상세" width="280"></td>
+    <td><details><summary><b>한정판매 상세</b></summary><br>선착순 한정판매 상품의 정보와 평점, 후기를 확인하고 찜하거나 구매 대기열에 참여합니다.</details></td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/purchase-queue.png" alt="FIFO 구매 대기열" width="280"></td>
+    <td><details><summary><b>FIFO 구매 대기열</b></summary><br>구매 요청마다 티켓을 발급하고 현재 순번, 앞선 대기 수, 남은 수량, 1인 추가 구매 가능 수량을 실시간으로 보여줍니다.</details></td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/inventory-reserved.png" alt="재고 임시 확보" width="280"></td>
+    <td><details><summary><b>재고 임시 확보</b></summary><br>순번이 되면 구매 수량을 5분간 확보합니다. 시간 안에 결제하지 않거나 취소하면 다음 순번에게 자동으로 넘어갑니다.</details></td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/shipping-checkout.png" alt="배송정보 입력" width="280"></td>
+    <td><details><summary><b>배송정보 입력과 결제</b></summary><br>주소 검색으로 배송지를 입력하고 결제 금액을 확인한 뒤 Toss Payments로 결제합니다. 서버가 금액과 예약 상태를 다시 검증한 뒤 구매를 확정합니다.</details></td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/rate-limit.png" alt="반복 요청 제한" width="280"></td>
+    <td><details><summary><b>반복 요청 제한</b></summary><br>짧은 시간에 구매 요청을 반복하면 Redis 기반 속도 제한으로 차단하고, 다시 시도할 수 있는 시간을 안내합니다.</details></td>
+  </tr>
+</table>
+
+### 라이브커머스와 운영 화면
+
+<table width="100%">
+  <tr>
+    <th width="300">화면</th>
+    <th>기능 설명</th>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/live-commerce.png" alt="라이브커머스" width="280"></td>
+    <td><details><summary><b>라이브커머스</b></summary><br>진행 중인 라이브 방송과 시청자 수를 확인하고, 방송을 보며 실시간 채팅으로 판매자와 소통합니다. 판매자는 이 화면에서 라이브 방송을 신청합니다.</details></td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/seller-center.png" alt="판매자센터" width="280"></td>
+    <td><details><summary><b>판매자센터</b></summary><br>공동구매와 한정판매 상품의 진행 현황과 마감 시간을 관리하고, 배송 준비 건수와 정산 예정 금액을 확인합니다.</details></td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/admin-center.png" alt="관리자센터" width="280"></td>
+    <td><details><summary><b>관리자센터</b></summary><br>오늘 거래액, 신규 회원, 판매자 승인 대기, 신고 현황을 확인하고 판매자 입점 신청을 검토합니다.</details></td>
+  </tr>
+  <tr>
+    <td align="center" width="300"><img src="docs/images/admin-live-approval.png" alt="방송 승인 관리" width="280"></td>
+    <td><details><summary><b>방송 승인 관리</b></summary><br>판매자가 신청한 방송 일정과 상품을 검토해 승인하거나 반려합니다.</details></td>
+  </tr>
+</table>
+
+## 주요 기능
+
+### 구매자
+
+- 공동구매 및 한정판매 상품 조회·찜
+- 구매 대기열 접수와 실시간 순번 확인
+- 배송정보 입력 후 Toss Payments 결제
+- 라이브 방송 시청 및 WebSocket 실시간 채팅
+- 방송 알림 신청과 배송 조회
+- Google·Kakao·Naver 소셜 로그인
+
+### 판매자
+
+- 공동구매·한정판매 상품 및 주문 현황 관리
+- 라이브 방송 일정 신청과 승인 상태 확인
+- OBS 송출 정보 확인 및 방송 상태 관리
+- 배송·정산 현황 확인
+
+### 관리자
+
+- 판매자 입점 검토
+- 라이브 방송 승인·반려와 반려 사유 관리
+- 거래·회원·신고 현황 확인
+
+## 시스템 구성
+
+```mermaid
+flowchart TB
+    U[구매자·판매자·관리자] --> FE[React 19 / TypeScript]
+    FE --> API[Spring Boot REST API]
+    FE <--> WS[Spring WebSocket 채팅]
+    API --> DB[(MySQL)]
+    API --> REDIS[(Redis 7)]
+    API --> TOSS[Toss Payments]
+    API --> TRACK[배송조회 API]
+    API --> OAUTH[Google·Kakao·Naver OAuth2]
+    OBS[OBS Studio] --> MEDIA[MediaMTX]
+    MEDIA --> FE
+```
+
+## 기술 스택
+
+### Backend
+
+- Java 25, Spring Boot 4.1
+- Spring Data JPA, Spring Security, OAuth2 Client
+- Spring WebSocket, Bean Validation
+- Maven
+
+### Frontend
+
+- React 19, TypeScript 5
+- Vite 8, Vinext
+- Tailwind CSS 4, shadcn UI, Base UI
+
+### Data and Infrastructure
+
+- MySQL, Redis 7
+- Docker, MediaMTX, OBS Studio
+
+### External API
+
+- Toss Payments
+- Google·Kakao·Naver OAuth2
+- 주소 검색 API
+- 배송 조회 API
+
+## 테스트
+
+- `PurchaseQueueConcurrencyTest`: 동시 구매 요청에서 한정 수량만 예약되는지 검증
+- `GroupBuyConcurrencyTest`: 동시 참여 요청에서도 공동구매 참여 수량이 정확하게 증가하는지 검증
+- `MemberServiceTest`: 회원 가입과 인증 관련 서비스 로직 검증
+- `HealthControllerTest`: 백엔드 상태 확인 API 검증
+
+```bash
 cd backend
 ./mvnw test
 로컬 실행
