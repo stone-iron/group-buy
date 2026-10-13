@@ -1,14 +1,19 @@
+<div align="center">
+
 # 여기모여
 
-> 라이브 방송을 보며 공동구매와 한정판매에 참여하고, 요청이 몰려도 **도착한 순서대로·준비된 수량만큼만** 판매되는 라이브커머스 플랫폼
+### 라이브 방송을 보며 공동구매와 한정판매에 참여하는 라이브커머스 플랫폼
 
-## 배포 주소 · GitHub · 시연 영상
+한정 수량 상품에 요청이 동시에 몰려도 **서버 도착 순서대로 결제 기회를 제공하고,<br>
+준비된 수량보다 많이 판매되지 않도록** FIFO 구매 대기열과 재고 예약 시스템을 구현했습니다.
 
-| 구분 | 주소 |
-| --- | --- |
-| 배포 주소 | 준비 중 |
-| GitHub | https://github.com/stone-iron/group-buy |
-| 시연 영상 | 준비 중 |
+[![Service](https://img.shields.io/badge/Service-gather--here.duckdns.org-13B982?style=for-the-badge&logo=googlechrome&logoColor=white)](https://gather-here.duckdns.org)
+[![GitHub](https://img.shields.io/badge/GitHub-stone--iron%2Fgroup--buy-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/stone-iron/group-buy)
+![Demo](https://img.shields.io/badge/Demo_Video-준비_중-8B95A1?style=for-the-badge&logo=youtube&logoColor=white)
+
+</div>
+
+---
 
 ## 프로젝트 정보
 
@@ -16,227 +21,243 @@
 | --- | --- |
 | 개발 기간 | 2026.09.16 ~ 2026.10.06 |
 | 개발 인원 | 1명 |
-| 담당 범위 | 기획, UI, 프론트엔드, 백엔드, DB 설계, 외부 API 연동 |
-| 핵심 주제 | 동시성 제어, 초과 판매 방지, 매크로·미결제 악용 방지 |
+| 담당 범위 | 기획, UI, 프론트엔드, 백엔드, DB 설계, 외부 API 연동, 배포 |
+| 핵심 주제 | 동시성 제어, FIFO 대기열, 초과 판매 방지, 매크로·미결제 악용 방지 |
+| 배포 환경 | AWS EC2, Docker Compose, Caddy |
+
+## 메인 화면 및 주요 기능
+
+### 구매자 메인
+
+추천 기획전과 함께 현재 참여 인원, 오늘 마감되는 공동구매, 평균 할인율과 배송 현황을 확인합니다.
+
+<p align="center">
+  <img src="docs/images/buyer-home.png" alt="여기모여 구매자 메인 화면" width="820">
+</p>
+
+### 역할별 주요 기능
+
+| 구매자 | 판매자 | 관리자 |
+| --- | --- | --- |
+| 공동구매·한정판매 조회 및 찜 | 상품·주문 현황 관리 | 판매자 입점 검토 |
+| FIFO 대기열 참여와 순번 확인 | 라이브 방송 일정 신청 | 방송 승인·반려 및 사유 관리 |
+| 배송 정보 입력 및 결제 | OBS 송출 정보·방송 상태 관리 | 거래·회원·신고 현황 확인 |
+| 라이브 시청·실시간 채팅 | 배송·정산 현황 확인 | 서비스 운영 지표 확인 |
+| 소셜 로그인·배송 조회 | 참여 신청자와 구매 현황 확인 |  |
 
 ## 핵심 문제와 해결 결과
 
-라이브커머스 한정판매에서는 짧은 시간에 많은 구매 요청이 들어옵니다. 결제 완료 순으로 판매하면 네트워크와 결제 속도가 빠른 사용자에게 유리하고, 여러 사용자가 결제를 진행한 뒤에야 품절을 겪을 수 있습니다. 여기모여는 구매 요청을 먼저 접수해 순서를 확정하고, 순번이 된 사용자에게만 재고를 임시로 확보합니다.
+라이브커머스 한정판매에서는 짧은 시간에 구매 요청이 집중됩니다. 단순히 결제 완료 순으로 판매하면 네트워크와 결제 속도가 빠른 사용자에게 유리하고, 여러 사용자가 결제를 진행한 뒤 품절을 경험할 수 있습니다.
 
-| 문제 | 해결 | 결과 |
+여기모여는 **구매 요청이 서버에 도착한 시점에 순서를 확정**하고, 순번이 된 사용자에게만 재고를 임시 예약합니다. 재고 확인과 갱신은 DB 트랜잭션과 잠금으로 직렬화하고, 결제 승인 이후에도 서버가 예약 상태와 금액을 다시 검증합니다.
+
+| 문제 | 해결 방법 | 검증 결과 |
 | --- | --- | --- |
-| 결제가 빠른 사용자에게 유리한 선착순 | 요청마다 티켓을 발급하고 도착 순서대로 처리하는 FIFO 대기열 | 1,000건 동시 요청에서 순서 역전 0건 |
-| 동시 요청으로 인한 초과 판매 | 재고 행 비관적 잠금과 결제 전 임시 예약 | 재고 100개에 1,000명이 몰려도 초과 점유 0회 |
-| 재고를 잡고 결제하지 않는 선점 | 5분 예약 만료 후 다음 순번에게 자동 인계, 반복 미결제 패널티 | 만료된 예약 5건이 다음 순번 5명에게 그대로 인계 |
-| 매크로·더블 클릭 반복 요청 | Redis 속도 제한, 회원별 활성 티켓 1개, `requestKey` 멱등 처리 | 같은 회원 동시 50회 요청 → 티켓 1건 |
-| 클라이언트가 보낸 결제 결과 조작 | Toss 승인 후 서버에서 금액·소유자·예약 만료를 다시 검증 | 검증을 통과한 예약만 구매 확정 |
-| **실제 MySQL에서만 드러난 데드락과 제한 우회** | 격리 수준 READ COMMITTED, 잠금 이후 중복 확인, 상품 단위 트랜잭션, 인덱스 | 요청 실패 119건 → **0건**, 처리량 140 → **234 req/s** |
+| 동시 요청 시 초과 판매 | 상품 재고 행에 `PESSIMISTIC_WRITE` 적용 | 1,000건 동시 요청에서 초과 판매 0건 |
+| 결제 속도에 따른 불공정 | 서버 도착 순서 기반 FIFO 티켓 발급 | 예약 순서 역전 0건 |
+| 결제 중 재고 소진 | 순번 사용자에게 5분간 재고 임시 예약 | 미결제·취소 시 다음 순번으로 자동 이전 |
+| 더블 클릭·재전송 | `requestKey` 기반 멱등 처리 | 동일 키 50건 동시 요청에서 티켓 1건 생성 |
+| 매크로·반복 요청 | Redis Lua Script 기반 사용자·IP 속도 제한 | 동일 사용자 100건 중 3건, 동일 IP 100건 중 20건 허용 |
+| 반복적인 미결제 선점 | 만료 횟수 기반 단계별 참여 제한 | 24시간 내 3회 만료 시 30분, 5회 만료 시 24시간 차단 |
 
 ## 구매 처리 흐름
 
 ```mermaid
 flowchart LR
-    A[구매 요청] --> B[요청 제한 검사]
+    A[구매 요청] --> B[속도·중복·구매 제한 검사]
     B --> C[대기열 티켓 발급]
     C --> D[FIFO 순서 처리]
     D --> E[DB 비관적 잠금]
     E --> F[재고 5분 임시 예약]
-    F --> G[배송정보 입력]
-    G --> H[Toss 결제]
-    H --> I[금액·소유자·만료 검증]
+    F --> G[배송 정보 입력]
+    G --> H[Toss Payments 결제]
+    H --> I[금액·소유자·만료 상태 재검증]
     I --> J[구매 확정]
-    F -->|취소 또는 만료| K[재고 반환]
+    F -->|취소·만료| K[재고 반환]
     K --> D
 ```
 
-### FIFO 구매 대기열
+### 상태 전이
 
-- 구매 요청마다 티켓을 발급하고 티켓 번호 순서대로 처리합니다.
-- `WAITING → PROCESSING → RESERVED → CONFIRMED` 상태를 구분해 관리합니다.
-- 구매자에게 현재 순번, 앞선 요청 수, 남은 수량을 표시합니다.
-- 결제 속도가 아니라 구매 요청이 서버에 도착한 순서로 기회를 제공합니다.
+```text
+WAITING → PROCESSING → RESERVED → CONFIRMED
+                         ├──────→ CANCELLED
+                         └──────→ EXPIRED → 다음 순번 처리
 
-### 동시성 및 초과 판매 방지
-
-- JPA `PESSIMISTIC_WRITE` 비관적 잠금으로 같은 재고의 동시 갱신을 막습니다.
-- 재고를 바꾸는 트랜잭션은 `READ COMMITTED`로 실행해, 잠금을 얻은 뒤에는 다른 요청이 커밋한 최신 데이터를 읽습니다.
-- 중복 요청과 1인 한도 확인은 재고 잠금을 얻은 **뒤에** 합니다. 같은 상품의 요청은 잠금 앞에서 줄을 서므로 뒤 요청은 앞 요청이 만든 티켓을 확인할 수 있습니다.
-- 대기열 처리 스케줄러는 상품마다 별도 트랜잭션으로 실행해 한 번에 하나의 재고 잠금만 보유합니다.
-- 예약 만료 또는 구매 취소 시 다음 순번에게 재고를 자동으로 넘깁니다.
-- Toss Payments 승인 후 서버가 주문 금액과 예약 상태를 다시 검증한 뒤 구매를 확정합니다.
-
-### 매크로 및 악용 방지
-
-| 안전장치 | 정책 |
-| --- | --- |
-| 사용자 요청 제한 | 사용자당 초당 3회 |
-| IP 요청 제한 | IP당 초당 20회 |
-| 구매 수량 제한 | 상품별 1인 최대 수량 적용 |
-| 중복 요청 방지 | 활성 티켓 검사 및 `requestKey` 기반 멱등 처리 |
-| 미결제 패널티 | 24시간 내 3회 만료 시 30분, 5회 만료 시 24시간 참여 제한 |
-| Redis 장애 대응 | Fail-open 후 DB 락과 수량 제한으로 재고 정합성 유지 |
-
-요청 제한은 Redis Lua Script로 카운트 증가와 만료 시간 설정을 원자적으로 처리합니다. 사용자가 직접 취소한 요청과 결제 실패는 미결제 패널티에 포함하지 않습니다.
+WAITING → SOLD_OUT
+```
 
 ## 성능·동시성 테스트 결과
 
-### MySQL 부하 테스트 (`PurchaseQueueLoadTest`)
+H2 기반 테스트는 모두 통과했지만, 실제 MySQL에서 1,000건의 동시 요청을 실행하자 잠금 순서 차이와 `REPEATABLE READ`의 스냅샷 읽기로 인해 데드락과 1인 요청 제한 우회가 발생했습니다.
 
-H2 기반 동시성 테스트는 모두 통과했지만, 실제 MySQL에서 같은 흐름을 다시 검증하자 H2에서는 드러나지 않던 문제가 발견되었습니다. 테스트는 로컬 MySQL에서 1,000건의 구매 요청을 동시에 출발시키는 동안 대기열 스케줄러 4개를 함께 실행하고, 이어서 예약자 100명의 결제를 동시에 확정했습니다.
+중복 확인을 재고 잠금 이후로 이동하고 트랜잭션 격리 수준을 `READ COMMITTED`로 조정했습니다. 또한 상품 단위로 트랜잭션을 정리하고 인덱스를 추가해 잠금 범위를 축소했습니다.
 
-| 항목 | 수정 전 | 수정 후 |
-| --- | --- | --- |
-| 동시 요청 1,000건 중 실패 | **119건** (데드락) | **0건** |
-| 처리량 | 140 req/s | **234 req/s** |
-| 응답 시간 p50 / p95 | 3,738 ms / 6,426 ms | **2,528 ms / 4,063 ms** |
-| 재고 100개 초과 점유 · 순서 역전 | 0회 · 0건 | 0회 · 0건 |
-| 같은 회원이 다른 `requestKey`로 동시 50회 요청 | 티켓 **50건** (1인 제한 우회) | 티켓 **1건** |
-| 같은 `requestKey`로 동시 50회 요청 | 티켓 1건, 오류 **49건** | 티켓 1건, 오류 **0건** |
-| 예약자 100명 동시 결제 | - | 실패 0건, 판매 100개, 남은 예약 0개 |
-| 미결제 만료 후 다음 순번 인계 | 5명 → 5명 | 5명 → 5명 |
+### 개선 전후
+
+| 항목 | 개선 전 | 개선 후 |
+| --- | ---: | ---: |
+| 1,000건 동시 구매 요청 실패 | 데드락 119건 | 0건 |
+| 동일 회원 50건 동시 요청 | 1인 요청 제한 우회 | 티켓 1건만 발급 |
+| 처리량 | 140 req/s | 234 req/s |
+| 응답 시간 p50 / p95 | 3,738 ms / 6,426 ms | 2,528 ms / 4,063 ms |
+| 동일 `requestKey` 50건 동시 요청 | 티켓 1건·오류 49건 | 티켓 1건·오류 0건 |
+| 재고 초과 점유 / FIFO 순서 역전 | 0회 / 0건 | 0회 / 0건 |
 
 <details>
-<summary><b>원인과 수정 내용</b></summary>
+<summary><b>문제의 원인과 수정 내용</b></summary>
 
 | 문제 | 원인 | 수정 |
 | --- | --- | --- |
-| 데드락 119건 | 스케줄러는 만료 티켓 → 재고, 구매 요청은 재고 → 새 티켓 순으로 잠갔고, 인덱스가 없어 `FOR UPDATE`가 테이블 전체에 범위 잠금(gap lock)을 걸어 INSERT를 막음 | `READ COMMITTED`로 범위 잠금 제거, 스케줄러를 상품 단위 트랜잭션으로 분리, 조회용 인덱스 3개 추가 |
-| 1인 제한 우회 | `REPEATABLE READ`에서는 트랜잭션의 첫 조회 시점 스냅샷을 계속 읽어, 재고 잠금을 기다리는 동안 다른 요청이 만든 티켓을 보지 못함 | 구매 요청 트랜잭션을 `READ COMMITTED`로 실행 |
-| 중복 요청 오류 49건 | 중복 키 오류가 난 Hibernate 세션으로 다시 조회하면서 `AssertionFailure` 발생 | `requestKey` 확인을 재고 잠금 이후로 옮겨 중복 INSERT 자체를 방지 |
+| 데드락 119건 | 스케줄러와 구매 요청의 잠금 순서가 달랐고, 인덱스가 없어 `FOR UPDATE`의 범위 잠금이 신규 티켓 `INSERT`와 충돌 | 격리 수준을 `READ COMMITTED`로 조정하고 스케줄러를 상품 단위 트랜잭션으로 분리, 조회 인덱스 추가 |
+| 1인 요청 제한 우회 | `REPEATABLE READ`의 스냅샷 읽기로 인해 잠금 대기 중 다른 요청이 생성한 티켓을 확인하지 못함 | 중복·1인 한도 확인을 재고 잠금 이후로 이동하고 최신 커밋 데이터 조회 |
+| 중복 요청 오류 49건 | 중복 키 오류가 발생한 Hibernate 세션에서 다시 조회하면서 `AssertionFailure` 발생 | `requestKey` 확인을 잠금 이후로 이동해 중복 `INSERT` 자체를 방지 |
 
 </details>
 
-### Redis 요청 제한
+### 최종 검증 시나리오
 
-`PurchaseRateLimitService`의 Lua Script를 Redis 7에서 그대로 실행해 측정했습니다.
+| 시나리오 | 결과 |
+| --- | --- |
+| 재고 100개 상품에 1,000명이 동시에 요청하고 스케줄러 4개가 병렬 처리 | 100건만 예약·구매 확정, 900건 품절 처리 |
+| 동일 `requestKey`로 50건 동시 요청 | 모든 요청에 같은 티켓을 반환하고 실제 티켓은 1건만 생성 |
+| 동일 회원이 서로 다른 `requestKey`로 50건 동시 요청 | 활성 티켓 1건만 생성 |
+| 재고 5개·대기자 10명 상황에서 최초 예약 5건 만료 | 다음 순번 5명에게 예약 이전, 미결제 기록 반영 |
+| 동일 사용자와 동일 IP에서 각각 100건 동시 요청 | 사용자 3건·IP 20건만 허용 |
 
-| 상황 | 허용 | 차단 |
-| --- | --- | --- |
-| 같은 회원이 동시에 100회 요청 (초당 3회 제한) | 3 | 97 |
-| 같은 IP에서 동시에 500회 요청 (초당 20회 제한) | 20 | 480 |
-| 같은 회원이 5초 동안 초당 약 50회 연속 요청 | 15 | 229 |
+테스트는 Java Virtual Thread로 동시 클라이언트를 구성하고 실제 MySQL·Redis 환경에서 수행했습니다. 실행 결과는 `target/loadtest-report.txt`에도 기록됩니다.
 
-### 테스트 목록
+### 테스트 구성
 
 | 테스트 | 검증 내용 |
 | --- | --- |
 | `PurchaseQueueLoadTest` | 실제 MySQL에서 1,000건 동시 요청, 중복·매크로 요청, 미결제 만료 인계, Redis 요청 제한 |
-| `PurchaseQueueConcurrencyTest` | 재고 5개에 요청 20건과 대기열 처리 80회를 동시 실행해 한정 수량만 확정되는지 검증 (H2) |
+| `PurchaseQueueConcurrencyTest` | 재고 5개에 요청 20건과 대기열 처리 80회를 동시에 실행해 한정 수량만 확정되는지 검증 |
 | `GroupBuyConcurrencyTest` | 100명이 동시에 참여해도 공동구매 목표 수량 10을 넘지 않는지 검증 |
 | `MemberServiceTest` | 회원 가입과 인증 관련 서비스 로직 검증 |
 | `HealthControllerTest` | 백엔드 상태 확인 API 검증 |
 
 ```bash
 cd backend
-./mvnw test                                              # 기본 테스트 (H2)
-./mvnw test -Dtest=PurchaseQueueLoadTest -Dloadtest=true  # MySQL 부하 테스트 (MySQL·Redis 실행 필요)
-cat target/loadtest-report.txt                           # 부하 테스트 결과 요약
+./mvnw test
+./mvnw test -Dtest=PurchaseQueueLoadTest -Dloadtest=true
+cat target/loadtest-report.txt
 ```
 
-부하 테스트는 `live_group_buy_loadtest` 데이터베이스를 자동으로 만들어 사용하므로 기존 데이터에 영향을 주지 않습니다.
+부하 테스트는 별도의 `live_group_buy_loadtest` 데이터베이스를 사용하므로 기존 서비스 데이터에 영향을 주지 않습니다.
 
 ## 시스템 구성도
 
 ```mermaid
 flowchart TB
-    U[구매자·판매자·관리자] --> FE[React 19 / TypeScript]
-    FE --> API[Spring Boot REST API]
-    FE <--> WS[Spring WebSocket 채팅]
-    API --> DB[(MySQL)]
+    U[구매자·판매자·관리자] --> CADDY[Caddy / HTTPS]
+    CADDY --> FE[React 19 / TypeScript]
+    CADDY --> API[Spring Boot REST API]
+    CADDY <--> WS[Spring WebSocket / STOMP]
+
+    API --> DB[(MySQL 8.4)]
     API --> REDIS[(Redis 7)]
     API --> TOSS[Toss Payments]
-    API --> TRACK[배송조회 API]
+    API --> TRACK[배송 조회 API]
     API --> OAUTH[Google·Kakao·Naver OAuth2]
-    OBS[OBS Studio] --> MEDIA[MediaMTX]
-    MEDIA --> FE
+
+    OBS[OBS Studio] -->|RTMP| MEDIA[MediaMTX]
+    MEDIA -->|HLS / WebRTC| FE
 ```
 
-## 주요 기능 및 대표 화면
+## 대표 화면
 
-| 역할 | 기능 |
-| --- | --- |
-| 구매자 | 상품 조회·찜, 구매 대기열과 실시간 순번 확인, Toss 결제, 라이브 시청·채팅, 방송 알림, 배송 조회, 소셜 로그인 |
-| 판매자 | 공동구매·한정판매 상품과 주문 관리, 방송 일정 신청, OBS 송출 정보 확인, 배송·정산 현황 |
-| 관리자 | 판매자 입점 검토, 방송 승인·반려와 반려 사유 관리, 거래·회원·신고 현황 확인 |
+### FIFO 구매 대기열
 
-### 메인 화면
+구매 요청마다 티켓을 발급하고 현재 순번, 앞선 대기 수, 남은 재고와 추가 구매 가능 수량을 실시간으로 안내합니다.
 
-<table width="100%">
-  <tr>
-    <th width="420">화면</th>
-    <th>기능 설명</th>
-  </tr>
-  <tr>
-    <td align="center" width="420"><img src="docs/images/buyer-home.png" alt="여기모여 메인 화면" width="400"></td>
-    <td><details><summary><b>메인 화면</b></summary><br>추천 기획전 배너와 함께 지금 참여 중인 인원, 오늘 마감되는 공동구매, 평균 할인율, 배송 현황을 한눈에 보여줍니다.</details></td>
-  </tr>
-</table>
+<p align="center">
+  <img src="docs/images/purchase-queue.png" alt="FIFO 구매 대기열" width="820">
+</p>
 
-### 한정판매 구매 흐름
+### 재고 예약과 결제
+
+순번이 되면 재고를 5분간 확보합니다. 배송지를 입력하고 Toss Payments로 결제하면 서버가 결제 금액과 예약 상태를 다시 확인한 뒤 구매를 확정합니다.
 
 <table width="100%">
   <tr>
-    <th width="420">화면</th>
-    <th>기능 설명</th>
+    <td align="center" width="50%"><img src="docs/images/inventory-reserved.png" alt="재고 임시 예약" width="400"></td>
+    <td align="center" width="50%"><img src="docs/images/shipping-checkout.png" alt="배송 정보 입력과 결제" width="400"></td>
   </tr>
   <tr>
-    <td align="center" width="420"><img src="docs/images/product-detail.png" alt="한정판매 상세" width="400"></td>
-    <td><details><summary><b>한정판매 상세</b></summary><br>선착순 한정판매 상품의 정보와 평점, 후기를 확인하고 찜하거나 구매 대기열에 참여합니다.</details></td>
-  </tr>
-  <tr>
-    <td align="center" width="420"><img src="docs/images/purchase-queue.png" alt="FIFO 구매 대기열" width="400"></td>
-    <td><details><summary><b>FIFO 구매 대기열</b></summary><br>구매 요청마다 티켓을 발급하고 현재 순번, 앞선 대기 수, 남은 수량, 1인 추가 구매 가능 수량을 실시간으로 보여줍니다.</details></td>
-  </tr>
-  <tr>
-    <td align="center" width="420"><img src="docs/images/inventory-reserved.png" alt="재고 임시 확보" width="400"></td>
-    <td><details><summary><b>재고 임시 확보</b></summary><br>순번이 되면 구매 수량을 5분간 확보합니다. 시간 안에 결제하지 않거나 취소하면 다음 순번에게 자동으로 넘어갑니다.</details></td>
-  </tr>
-  <tr>
-    <td align="center" width="420"><img src="docs/images/shipping-checkout.png" alt="배송정보 입력" width="400"></td>
-    <td><details><summary><b>배송정보 입력과 결제</b></summary><br>주소 검색으로 배송지를 입력하고 결제 금액을 확인한 뒤 Toss Payments로 결제합니다. 서버가 금액과 예약 상태를 다시 검증한 뒤 구매를 확정합니다.</details></td>
-  </tr>
-  <tr>
-    <td align="center" width="420"><img src="docs/images/rate-limit.png" alt="반복 요청 제한" width="400"></td>
-    <td><details><summary><b>반복 요청 제한</b></summary><br>짧은 시간에 구매 요청을 반복하면 Redis 기반 속도 제한으로 차단하고, 다시 시도할 수 있는 시간을 안내합니다.</details></td>
+    <td align="center"><b>재고 임시 예약</b></td>
+    <td align="center"><b>배송 정보 입력 및 결제</b></td>
   </tr>
 </table>
 
-### 라이브커머스와 운영 화면
+### 라이브커머스
+
+구매자는 라이브 방송을 시청하며 WebSocket 채팅으로 판매자와 소통합니다. 판매자는 관리자에게 방송 일정을 신청하고, 승인된 스트림 정보를 OBS에 연결해 송출합니다.
+
+<p align="center">
+  <img src="docs/images/live-commerce.png" alt="여기모여 라이브커머스" width="820">
+</p>
+
+<details>
+<summary><b>판매자·관리자 및 추가 화면 보기</b></summary>
+
+### 판매자센터
+
+<p align="center">
+  <img src="docs/images/seller-center.png" alt="판매자센터" width="820">
+</p>
+
+### 관리자센터와 방송 승인
 
 <table width="100%">
   <tr>
-    <th width="420">화면</th>
-    <th>기능 설명</th>
+    <td align="center" width="50%"><img src="docs/images/admin-center.png" alt="관리자센터" width="400"></td>
+    <td align="center" width="50%"><img src="docs/images/admin-live-approval.png" alt="방송 승인 관리" width="400"></td>
   </tr>
   <tr>
-    <td align="center" width="420"><img src="docs/images/live-commerce.png" alt="라이브커머스" width="400"></td>
-    <td><details><summary><b>라이브커머스</b></summary><br>진행 중인 라이브 방송과 시청자 수를 확인하고, 방송을 보며 실시간 채팅으로 판매자와 소통합니다. 판매자는 이 화면에서 라이브 방송을 신청합니다.</details></td>
-  </tr>
-  <tr>
-    <td align="center" width="420"><img src="docs/images/seller-center.png" alt="판매자센터" width="400"></td>
-    <td><details><summary><b>판매자센터</b></summary><br>공동구매와 한정판매 상품의 진행 현황과 마감 시간을 관리하고, 배송 준비 건수와 정산 예정 금액을 확인합니다.</details></td>
-  </tr>
-  <tr>
-    <td align="center" width="420"><img src="docs/images/admin-center.png" alt="관리자센터" width="400"></td>
-    <td><details><summary><b>관리자센터</b></summary><br>오늘 거래액, 신규 회원, 판매자 승인 대기, 신고 현황을 확인하고 판매자 입점 신청을 검토합니다.</details></td>
-  </tr>
-  <tr>
-    <td align="center" width="420"><img src="docs/images/admin-live-approval.png" alt="방송 승인 관리" width="400"></td>
-    <td><details><summary><b>방송 승인 관리</b></summary><br>판매자가 신청한 방송 일정과 상품을 검토해 승인하거나 반려합니다.</details></td>
+    <td align="center"><b>서비스 운영 현황</b></td>
+    <td align="center"><b>라이브 방송 승인·반려</b></td>
   </tr>
 </table>
+
+### 상품 상세와 반복 요청 제한
+
+<table width="100%">
+  <tr>
+    <td align="center" width="50%"><img src="docs/images/product-detail.png" alt="한정판매 상품 상세" width="400"></td>
+    <td align="center" width="50%"><img src="docs/images/rate-limit.png" alt="반복 요청 제한" width="400"></td>
+  </tr>
+  <tr>
+    <td align="center"><b>한정판매 상품 상세</b></td>
+    <td align="center"><b>Redis 기반 반복 요청 제한</b></td>
+  </tr>
+</table>
+
+</details>
 
 ## 기술 스택
 
-| 구분 | 기술 |
+| 영역 | 기술 |
 | --- | --- |
-| Backend | Java 25, Spring Boot 4.1, Spring Data JPA, Spring Security, OAuth2 Client, Spring WebSocket, Bean Validation, Maven |
-| Frontend | React 19, TypeScript 5, Vite 8, Vinext, Tailwind CSS 4, shadcn UI, Base UI |
-| Data · Infra | MySQL, Redis 7, Docker, MediaMTX, OBS Studio |
+| Backend | Java 25, Spring Boot 4.1.0, Spring Security 7.1.0, Spring Data JPA 4.1.0, Spring WebSocket 7.0.8, OAuth2 Client, Bean Validation, Maven |
+| Frontend | React 19.2.6, TypeScript 5.9.3, Vite 8.0.13, Vinext 1.0.0-beta.5, Tailwind CSS 4.2.1, shadcn UI, Base UI |
+| Database | MySQL 8.4, Redis 7 |
+| Live Streaming | MediaMTX 1, OBS Studio, RTMP, HLS, WebRTC |
+| Infrastructure | AWS EC2, Docker Compose, Caddy 2 |
 | External API | Toss Payments, Google·Kakao·Naver OAuth2, 주소 검색 API, 배송 조회 API |
-| Test | JUnit 5, Spring Boot Test, H2 (단위·동시성), MySQL (부하 테스트) |
+| Test | JUnit 5, AssertJ, H2, MySQL·Redis 통합 부하 테스트 |
 
-## 실행 방법 · 환경변수 · 프로젝트 구조
+## 실행 방법·환경변수·프로젝트 구조
+
+<details>
+<summary><b>로컬 실행 방법</b></summary>
+
+### 요구 사항
+
+- Java 25
+- Node.js 22.13 이상
+- MySQL 8.4
+- Docker 및 Docker Compose
 
 ### 1. MySQL 데이터베이스 생성
 
@@ -264,6 +285,8 @@ cp .env.properties.example .env.properties
 
 ### 4. 프론트엔드 실행
 
+프로젝트 루트에서 실행합니다.
+
 ```bash
 cp .env.example .env.local
 npm install
@@ -283,22 +306,51 @@ docker run --rm --name mediamtx \
   bluenviron/mediamtx:1
 ```
 
-OBS의 서버 주소는 `rtmp://localhost:1935`이며 스트림 키는 판매자 방송 관리 화면에서 확인합니다.
+OBS 서버 주소는 `rtmp://localhost:1935`이며 스트림 키는 판매자 방송 관리 화면에서 확인합니다.
 
-### 환경변수
+</details>
 
-실제 키는 Git에 커밋하지 않고 예시 파일을 복사해 로컬에서 설정합니다.
+<details>
+<summary><b>프로덕션 실행 방법</b></summary>
 
-| 위치 | 변수 | 설명 |
-| --- | --- | --- |
-| Frontend | `NEXT_PUBLIC_API_URL` | 백엔드 API 주소 |
-| Frontend | `NEXT_PUBLIC_TOSS_CLIENT_KEY` | Toss Payments 클라이언트 키 |
-| Backend | `spring.datasource.password` | MySQL 비밀번호 |
-| Backend | `payment.toss.secret-key` | Toss Payments 시크릿 키 |
-| Backend | `delivery.tracking.api-key` | 배송 조회 API 키 |
-| Backend | OAuth Client ID·Secret | Google·Kakao·Naver 로그인 설정 |
+```bash
+cp .env.production.example .env.production
+docker compose --env-file .env.production -f docker-compose.prod.yml --profile live up -d --build
+```
 
-### 프로젝트 구조
+`.env.production`의 `PUBLIC_HOST`와 DB 비밀번호, 외부 연동 키를 실제 값으로 변경해야 합니다. 비밀 키가 포함된 환경변수 파일은 Git에 커밋하지 않습니다.
+
+</details>
+
+<details>
+<summary><b>환경변수</b></summary>
+
+### Frontend
+
+| 변수 | 설명 |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | 백엔드 API 주소 |
+| `NEXT_PUBLIC_RTMP_URL` | OBS 송출 서버 주소 |
+| `NEXT_PUBLIC_HLS_URL` | 라이브 HLS 재생 주소 |
+| `NEXT_PUBLIC_WS_URL` | 실시간 통신 WebSocket 주소 |
+| `NEXT_PUBLIC_TOSS_CLIENT_KEY` | Toss Payments 클라이언트 키 |
+
+### Backend
+
+| 변수 | 설명 |
+| --- | --- |
+| `DB_URL`, `DB_USERNAME`, `DB_PASSWORD` | MySQL 접속 정보 |
+| `REDIS_HOST`, `REDIS_PORT` | Redis 접속 정보 |
+| `TOSS_SECRET_KEY` | Toss Payments 시크릿 키 |
+| `SWEET_TRACKER_API_KEY` | 배송 조회 API 키 |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google OAuth2 설정 |
+| `KAKAO_CLIENT_ID`, `KAKAO_CLIENT_SECRET` | Kakao OAuth2 설정 |
+| `NAVER_CLIENT_ID`, `NAVER_CLIENT_SECRET` | Naver OAuth2 설정 |
+
+</details>
+
+<details>
+<summary><b>프로젝트 구조</b></summary>
 
 ```text
 group-buy-platform/
@@ -306,22 +358,24 @@ group-buy-platform/
 ├── components/             # 공통 UI 컴포넌트
 ├── docs/images/            # README 주요 화면
 ├── backend/
-│   └── src/
-│       ├── main/java/com/livegroupbuy/backend/
-│       │   ├── purchase/   # FIFO 대기열, 재고 예약, 요청 제한
-│       │   ├── payment/    # Toss 결제 준비·승인
-│       │   ├── groupbuy/   # 공동구매 참여 처리
-│       │   ├── live/       # 방송 신청·승인·채팅
-│       │   ├── member/     # 회원·프로필·소셜 로그인
-│       │   └── delivery/   # 배송 조회
-│       └── test/           # 동시성·부하 테스트
-└── docker-compose.yml      # Redis 실행 환경
+│   └── src/main/java/com/livegroupbuy/backend/
+│       ├── purchase/       # FIFO 대기열, 재고 예약, 요청 제한
+│       ├── payment/        # Toss 결제 준비·승인
+│       ├── groupbuy/       # 공동구매 참여 처리
+│       ├── live/           # 방송 신청·승인·채팅
+│       ├── member/         # 회원·프로필·소셜 로그인
+│       └── delivery/       # 배송 조회
+├── docker-compose.yml      # 로컬 Redis 실행 환경
+└── docker-compose.prod.yml # 프로덕션 전체 실행 환경
 ```
+
+</details>
 
 ## 구현하며 배운 점
 
-- 동시성 문제는 화면에서 순서를 표시하는 것만으로 해결되지 않으며, DB 트랜잭션과 잠금이 최종 정합성을 보장해야 합니다.
-- 잠금을 거는 것만으로는 충분하지 않습니다. `REPEATABLE READ`에서는 잠금을 얻은 뒤에도 오래된 스냅샷을 읽을 수 있어, 격리 수준과 잠금 순서, 잠금 범위를 함께 설계해야 합니다.
-- H2에서 통과한 테스트도 실제 MySQL의 격리 수준과 잠금 방식에서는 다르게 동작할 수 있어, 운영과 같은 DB에서 부하 테스트로 다시 검증해야 합니다.
-- 외부 결제 성공 응답만 신뢰하지 않고 서버의 주문 금액, 예약 소유자, 만료 여부를 다시 검증해야 합니다.
-- 요청 제한은 강하게 차단하는 것뿐 아니라 Redis 장애나 정상 사용자의 취소처럼 예외 상황을 구분하는 정책이 중요합니다.
+- 동시성 문제는 화면에서 순서를 보여주는 것으로 해결되지 않으며, 서버의 트랜잭션과 잠금이 최종 데이터 정합성을 보장해야 합니다.
+- H2에서 통과한 코드도 실제 MySQL의 격리 수준과 잠금 방식에서는 다르게 동작할 수 있으므로 운영 환경과 유사한 조건에서 다시 검증해야 합니다.
+- 잠금의 강도만 높이는 것이 아니라 트랜잭션 순서와 인덱스를 함께 조정해 잠금 범위를 줄여야 정합성과 처리량을 함께 확보할 수 있습니다.
+- 외부 결제 성공 응답을 그대로 신뢰하지 않고 서버에서 주문 금액, 예약 소유자와 만료 상태를 다시 검증해야 합니다.
+- 요청 제한은 정상 사용자의 취소와 결제 실패, Redis 장애 같은 예외 상황을 구분하면서도 DB 잠금과 구매 수량 제한으로 재고 정합성을 유지해야 합니다.
+- 기능 완성 여부를 정상 흐름만으로 판단하지 않고 중복 요청, 미결제 선점, 서버 재시작과 같은 실패 상황까지 테스트하는 습관을 갖추었습니다.
