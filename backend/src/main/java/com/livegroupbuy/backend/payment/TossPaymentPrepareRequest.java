@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 
 public record TossPaymentPrepareRequest(
         @NotNull @Positive Long ticketId,
-        @NotNull @Positive Long memberId,
+        Long memberId, // 서버가 로그인 세션 값으로 채운다.
         @NotBlank @Size(max = 50) String recipientName,
         @NotBlank @Size(max = 20) String phone,
         @NotBlank @Size(max = 10) String postalCode,

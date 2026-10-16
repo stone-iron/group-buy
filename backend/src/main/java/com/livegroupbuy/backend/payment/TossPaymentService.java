@@ -87,10 +87,13 @@ public class TossPaymentService {
 
     // 잠금 순서: 결제 주문 → 티켓 → 재고. 바깥 트랜잭션의 격리 수준이 confirmPaidReservation에도 적용된다.
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    public PurchaseQueueResponse confirm(TossPaymentConfirmRequest request) {
+    public PurchaseQueueResponse confirm(TossPaymentConfirmRequest request, Long memberId) {
         requireSecretKey();
         TossPaymentOrder order = paymentRepository.findLockedByOrderId(request.orderId())
                 .orElseThrow(() -> new IllegalArgumentException("결제 주문 정보를 찾을 수 없습니다."));
+        if (!order.getMemberId().equals(memberId)) {
+            throw new IllegalArgumentException("본인의 결제 주문만 승인할 수 있습니다.");
+        }
         if (!order.getTicketId().equals(request.ticketId())) {
             throw new IllegalArgumentException("결제 주문과 대기열 요청이 일치하지 않습니다.");
         }

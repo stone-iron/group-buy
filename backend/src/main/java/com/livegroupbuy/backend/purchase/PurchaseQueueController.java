@@ -3,6 +3,7 @@ package com.livegroupbuy.backend.purchase;
 import java.util.List;
 
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,6 +14,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import jakarta.validation.Valid;
 import jakarta.servlet.http.HttpServletRequest;
+
+import com.livegroupbuy.backend.auth.LoginMember;
+import com.livegroupbuy.backend.auth.LoginSessionManager;
 
 @RestController
 @RequestMapping("/api/purchase-queue")
@@ -30,20 +34,26 @@ public class PurchaseQueueController {
     @PostMapping
     @ResponseStatus(HttpStatus.ACCEPTED)
     public PurchaseQueueResponse enqueue(@Valid @RequestBody PurchaseQueueRequest request,
+                                         @AuthenticationPrincipal LoginMember member,
                                          HttpServletRequest servletRequest) {
-        rateLimitService.assertRequestAllowed(request.memberId(), clientIp(servletRequest));
-        return service.enqueue(request);
+        // 회원 번호는 요청 본문이 아니라 로그인 세션에서 가져온다.
+        Long memberId = LoginSessionManager.require(member).id();
+        rateLimitService.assertRequestAllowed(memberId, servletRequest.getRemoteAddr());
+        return service.enqueue(new PurchaseQueueRequest(
+                request.productId(), memberId, request.quantity(), request.requestKey()
+        ));
     }
 
     @GetMapping("/{ticketId}")
-    public PurchaseQueueResponse status(@PathVariable Long ticketId) {
-        return service.status(ticketId);
+    public PurchaseQueueResponse status(@PathVariable Long ticketId,
+                                        @AuthenticationPrincipal LoginMember member) {
+        return service.statusForMember(ticketId, LoginSessionManager.require(member).id());
     }
 
     @PostMapping("/{ticketId}/cancel")
     public PurchaseQueueResponse cancel(@PathVariable Long ticketId,
-                                        @Valid @RequestBody PurchaseCancelRequest request) {
-        return service.cancel(ticketId, request);
+                                        @AuthenticationPrincipal LoginMember member) {
+        return service.cancel(ticketId, new PurchaseCancelRequest(LoginSessionManager.require(member).id()));
     }
 
     @GetMapping("/inventories")
@@ -54,13 +64,5 @@ public class PurchaseQueueController {
     @PostMapping("/inventories")
     public InventoryResponse registerInventory(@Valid @RequestBody InventoryRegistrationRequest request) {
         return service.registerInventory(request);
-    }
-
-    private String clientIp(HttpServletRequest request) {
-        String forwardedFor = request.getHeader("X-Forwarded-For");
-        if (forwardedFor != null && !forwardedFor.isBlank()) {
-            return forwardedFor.split(",", 2)[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 }

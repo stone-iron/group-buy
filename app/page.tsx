@@ -75,6 +75,8 @@ type SaleType = 'GROUP_BUY' | 'LIMITED_SALE';
 type MemberProfile = { id: number; name: string; email: string; role: Role; createdAt?: string };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080';
+// 로그인은 서버 세션 쿠키로 유지한다. 백엔드 API 요청에는 항상 쿠키를 함께 보낸다.
+const apiFetch = (input: string, init?: RequestInit) => fetch(input, { credentials: 'include', ...init });
 const OBS_SERVER_URL = process.env.NEXT_PUBLIC_RTMP_URL ?? 'rtmp://localhost:1935';
 const LIVE_PLAYER_BASE_URL = process.env.NEXT_PUBLIC_HLS_URL ?? 'http://localhost:8888';
 const LIVE_CHAT_WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? API_BASE_URL.replace(/^http/, 'ws');
@@ -233,7 +235,7 @@ const roleLabels: Record<Role, string> = {
 const streamKeyFor = (broadcast: LiveBroadcast) => broadcast.streamKey || `live-${broadcast.id}`;
 
 async function liveApi<T>(path = '', options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}/api/live-broadcasts${path}`, {
+  const response = await apiFetch(`${API_BASE_URL}/api/live-broadcasts${path}`, {
     ...options,
     headers: { 'Content-Type': 'application/json', ...options?.headers },
   });
@@ -338,11 +340,11 @@ export default function Home() {
   useEffect(() => {
     let active = true;
     void Promise.all([
-      fetch(`${API_BASE_URL}/api/purchase-queue/inventories`).then(async (response) => {
+      apiFetch(`${API_BASE_URL}/api/purchase-queue/inventories`).then(async (response) => {
         if (!response.ok) throw new Error();
         return response.json() as Promise<InventorySnapshot[]>;
       }),
-      fetch(`${API_BASE_URL}/api/group-buys`).then(async (response) => {
+      apiFetch(`${API_BASE_URL}/api/group-buys`).then(async (response) => {
         if (!response.ok) throw new Error();
         return response.json() as Promise<GroupBuyCampaignSnapshot[]>;
       }),
@@ -389,7 +391,7 @@ export default function Home() {
     if (paymentResult === 'fail') {
       setNotice(`결제가 완료되지 않았습니다. ${params.get('message') ?? '다시 시도해 주세요.'}`);
       if (Number.isFinite(ticketId)) {
-        void fetch(`${API_BASE_URL}/api/purchase-queue/${ticketId}`)
+        void apiFetch(`${API_BASE_URL}/api/purchase-queue/${ticketId}`)
           .then((response) => response.ok ? response.json() as Promise<PurchaseQueueTicket> : null)
           .then((ticket) => ticket && setPurchaseQueueTicket(ticket))
           .catch(() => undefined);
@@ -408,7 +410,7 @@ export default function Home() {
     }
 
     setIsPaymentOpening(true);
-    void fetch(`${API_BASE_URL}/api/payments/toss/confirm`, {
+    void apiFetch(`${API_BASE_URL}/api/payments/toss/confirm`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ ticketId, paymentKey, orderId, amount }),
@@ -432,7 +434,7 @@ export default function Home() {
     let active = true;
     const poll = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/purchase-queue/${purchaseQueueTicket.ticketId}`);
+        const response = await apiFetch(`${API_BASE_URL}/api/purchase-queue/${purchaseQueueTicket.ticketId}`);
         const result = await response.json().catch(() => ({})) as PurchaseQueueTicket & { message?: string };
         if (!response.ok) throw new Error(result.message ?? '대기열 상태를 확인하지 못했습니다.');
         if (!active) return;
@@ -532,7 +534,7 @@ export default function Home() {
     }
 
     setIsSubmitting(true);
-    void fetch(`${API_BASE_URL}/api/members/social-session`, { credentials: 'include' })
+    void apiFetch(`${API_BASE_URL}/api/members/social-session`, { credentials: 'include' })
       .then(async (response) => {
         const result = await response.json().catch(() => ({})) as { message?: string; id?: number; name?: string; email?: string; role?: string };
         if (!response.ok) throw new Error(result.message ?? '소셜 로그인 정보를 확인할 수 없습니다.');
@@ -588,7 +590,7 @@ export default function Home() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/members/login`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/members/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -650,7 +652,7 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/members/signup`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/members/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -688,6 +690,7 @@ export default function Home() {
   };
 
   const logout = () => {
+    void apiFetch(`${API_BASE_URL}/api/members/logout`, { method: 'POST' }).catch(() => undefined);
     setIsLoggedIn(false);
     setCurrentUser(null);
     setView('home');
@@ -712,10 +715,10 @@ export default function Home() {
 
     if (targetProduct.saleType === 'GROUP_BUY') {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/group-buys/${id}/participate`, {
+        const response = await apiFetch(`${API_BASE_URL}/api/group-buys/${id}/participate`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ memberId: currentUser.id, quantity }),
+          body: JSON.stringify({ quantity }),
         });
         const result = await response.json().catch(() => ({})) as GroupBuyCampaignSnapshot & { message?: string };
         if (!response.ok) throw new Error(result.message ?? '공동구매에 참여하지 못했습니다.');
@@ -733,12 +736,11 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/purchase-queue`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/purchase-queue`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           productId: id,
-          memberId: currentUser.id,
           quantity,
           requestKey: createRequestKey(),
         }),
@@ -761,10 +763,10 @@ export default function Home() {
     }
     setIsPaymentOpening(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/payments/toss/prepare`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/payments/toss/prepare`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ticketId: purchaseQueueTicket.ticketId, memberId: currentUser.id, ...shippingInformation }),
+        body: JSON.stringify({ ticketId: purchaseQueueTicket.ticketId, ...shippingInformation }),
       });
       const prepared = await response.json().catch(() => ({})) as TossPaymentPrepare & { message?: string };
       if (!response.ok) throw new Error(prepared.message ?? '토스 결제를 준비하지 못했습니다.');
@@ -854,10 +856,8 @@ export default function Home() {
 
     setIsPurchaseCancelling(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/purchase-queue/${purchaseQueueTicket.ticketId}/cancel`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/purchase-queue/${purchaseQueueTicket.ticketId}/cancel`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ memberId: currentUser.id }),
       });
       const result = await response.json().catch(() => ({})) as PurchaseQueueTicket & { message?: string };
       if (!response.ok) throw new Error(result.message ?? '구매 요청을 취소하지 못했습니다.');
@@ -898,7 +898,7 @@ export default function Home() {
       const payload = input.saleType === 'GROUP_BUY'
         ? { productId: nextId, productTitle: input.title, goalQuantity: input.target }
         : { productId: nextId, productTitle: input.title, totalQuantity: input.target, unitPrice: input.price };
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      const response = await apiFetch(`${API_BASE_URL}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1073,10 +1073,10 @@ export default function Home() {
         const productId = Number((input as { productId?: unknown })?.productId);
         const product = products.find((item) => item.id === productId);
         if (!product) throw new Error('존재하지 않는 상품입니다.');
-        const response = await fetch(`${API_BASE_URL}/api/purchase-queue`, {
+        const response = await apiFetch(`${API_BASE_URL}/api/purchase-queue`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ productId, memberId: 0, quantity: 1, requestKey: createRequestKey() }),
+          body: JSON.stringify({ productId, quantity: 1, requestKey: createRequestKey() }),
         });
         const result = await response.json().catch(() => ({})) as PurchaseQueueTicket & { message?: string };
         if (!response.ok) throw new Error(result.message ?? '구매 대기열에 접수하지 못했습니다.');
@@ -1606,7 +1606,7 @@ function ProfilePage({ profile: initialProfile, products: allProducts, broadcast
 
   useEffect(() => {
     const controller = new AbortController();
-    void fetch(`${API_BASE_URL}/api/members/${initialProfile.id}/profile`, { signal: controller.signal })
+    void apiFetch(`${API_BASE_URL}/api/members/${initialProfile.id}/profile`, { signal: controller.signal })
       .then(async (response) => {
         const result = await response.json().catch(() => ({})) as { message?: string; id?: number; name?: string; email?: string; role?: string; createdAt?: string };
         if (!response.ok) throw new Error(result.message ?? '프로필을 불러오지 못했습니다.');
@@ -1638,7 +1638,7 @@ function ProfilePage({ profile: initialProfile, products: allProducts, broadcast
 
     setIsSavingProfile(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/members/${profile.id}/profile`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/members/${profile.id}/profile`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -1678,7 +1678,7 @@ function ProfilePage({ profile: initialProfile, products: allProducts, broadcast
 
     setIsSavingPassword(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/api/members/${profile.id}/password`, {
+      const response = await apiFetch(`${API_BASE_URL}/api/members/${profile.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -2198,7 +2198,7 @@ function OrdersPage({ memberId, products: items, onOpenProduct }: { memberId: nu
 
   useEffect(() => {
     let active = true;
-    void fetch(`${API_BASE_URL}/api/group-buys/participations?memberId=${encodeURIComponent(memberId)}`)
+    void apiFetch(`${API_BASE_URL}/api/group-buys/participations`)
       .then(async (response) => {
         const result = await response.json().catch(() => ({})) as BuyerGroupBuyParticipation[] & { message?: string };
         if (!response.ok) throw new Error(result.message ?? '참여 내역을 불러오지 못했습니다.');
@@ -2225,7 +2225,7 @@ function OrdersPage({ memberId, products: items, onOpenProduct }: { memberId: nu
     }
     try {
       const params = new URLSearchParams({ carrierCode, invoice });
-      const response = await fetch(`${API_BASE_URL}/api/deliveries/track?${params.toString()}`);
+      const response = await apiFetch(`${API_BASE_URL}/api/deliveries/track?${params.toString()}`);
       const result = await response.json().catch(() => ({})) as DeliveryTrackingResult & { message?: string };
       if (!response.ok) throw new Error(result.message || '배송정보를 조회하지 못했습니다.');
       setTrackingResult(result);
@@ -2326,7 +2326,7 @@ function SellerProductManagement({ product, onBack, onSave }: { product: Product
   useEffect(() => {
     if (!isGroupBuy) return;
     let active = true;
-    void fetch(`${API_BASE_URL}/api/group-buys/${product.id}/participations`)
+    void apiFetch(`${API_BASE_URL}/api/group-buys/${product.id}/participations`)
       .then(async (response) => {
         const result = await response.json().catch(() => ({})) as SellerGroupBuyParticipation[] & { message?: string };
         if (!response.ok) throw new Error(result.message ?? '참여자 현황을 불러오지 못했습니다.');
