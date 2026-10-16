@@ -111,6 +111,17 @@ public class PurchaseQueueService {
     }
 
     @Transactional(readOnly = true)
+    public PurchaseQueueResponse statusForMember(Long ticketId, Long memberId) {
+        PurchaseTicket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new IllegalArgumentException("대기열 요청을 찾을 수 없습니다."));
+        if (!ticket.getMemberId().equals(memberId)) {
+            // 다른 회원의 티켓 존재 여부도 드러나지 않도록 같은 메시지를 쓴다.
+            throw new IllegalArgumentException("대기열 요청을 찾을 수 없습니다.");
+        }
+        return response(ticket);
+    }
+
+    @Transactional(readOnly = true)
     public List<InventoryResponse> inventories() {
         return inventoryRepository.findAll().stream()
                 .map(InventoryResponse::from)

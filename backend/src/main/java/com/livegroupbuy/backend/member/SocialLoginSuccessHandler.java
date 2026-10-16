@@ -13,19 +13,24 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 
+import com.livegroupbuy.backend.auth.LoginSessionManager;
+
 @Component
 public class SocialLoginSuccessHandler implements AuthenticationSuccessHandler {
 
     public static final String SOCIAL_MEMBER_SESSION_KEY = "SOCIAL_MEMBER";
 
     private final MemberService memberService;
+    private final LoginSessionManager loginSessionManager;
     private final String frontendUrl;
 
     public SocialLoginSuccessHandler(
             MemberService memberService,
+            LoginSessionManager loginSessionManager,
             @Value("${app.frontend-url:http://localhost:3000}") String frontendUrl
     ) {
         this.memberService = memberService;
+        this.loginSessionManager = loginSessionManager;
         this.frontendUrl = frontendUrl;
     }
 
@@ -41,6 +46,8 @@ public class SocialLoginSuccessHandler implements AuthenticationSuccessHandler {
         SocialProfile profile = extractProfile(provider, user.getAttributes());
         LoginResponse member = memberService.socialLogin(provider, profile.id(), profile.name(), profile.email());
 
+        // OAuth2 인증 정보 대신 우리 회원 정보로 세션 로그인 상태를 만든다.
+        loginSessionManager.signIn(member.id(), member.name(), member.email(), member.role(), request, response);
         request.getSession(true).setAttribute(SOCIAL_MEMBER_SESSION_KEY, member);
         response.sendRedirect(frontendUrl + "/?social=success");
     }
